@@ -222,7 +222,7 @@ router.post('/avatar',
 
 
 // Get user by ID or username (public profile)
-router.get('/:identifier', async (req, res) => {
+router.get('/:identifier', async  (req: Request, res: Response) => {
   try {
     const { identifier } = req.params;
 
@@ -288,7 +288,8 @@ router.get('/:identifier', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return ;
     }
 
     res.json(user);
