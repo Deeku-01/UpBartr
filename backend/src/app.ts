@@ -12,6 +12,7 @@ import exchangeRoutes from './routes/exchange';
 // import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
+app.use(express.json());
 
 // Security middleware
 
@@ -22,10 +23,10 @@ app.use(cors({
 
 
 // Routes
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/skills', skillsRoutes);
-// app.use('/api/exchanges', exchangeRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/skills', skillsRoutes);
+app.use('/api/exchanges', exchangeRoutes);
 
 // // Error handling
 // app.use(errorHandler);

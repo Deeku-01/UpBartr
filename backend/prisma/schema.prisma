@@ -17,14 +17,13 @@ datasource db {
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
-  username    String   @unique
+  username    String?   @unique
   firstName   String
   lastName    String
   password    String
   bio         String?
   avatar      String?
   location    String?
-  timezone    String?
   rating      Float    @default(0)
   totalRatings Int     @default(0)
   isVerified  Boolean  @default(false)
