@@ -5,7 +5,7 @@ import cors from 'cors';
 // Import routes
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
-import skillsRoutes from './routes/skills';
+import skillsRoutes from './routes/application';
 import exchangeRoutes from './routes/exchange';
 
 // // Import middleware
