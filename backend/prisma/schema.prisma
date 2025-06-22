@@ -1,12 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -30,103 +26,115 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Skills relationships
-  skillsOffered UserSkill[] // filter out later 
+  // Marketplace relationships
+  skillRequests     SkillRequest[]
+  applications      Application[]
+  skillRequestViews SkillRequestView[]
   
-  // Exchange relationships
-  exchangesAsTeacher ExchangeRequest[] @relation("Teacher")
-  exchangesAsStudent ExchangeRequest[] @relation("Student")
-  
-  // Reviews
-  reviewsGiven   Review[] @relation("ReviewGiver")
-  reviewsReceived Review[] @relation("ReviewReceiver")
+  // Review relationships
+  reviewsGiven      Review[] @relation("ReviewGiver")
+  reviewsReceived   Review[] @relation("ReviewReceiver")
 
   @@map("users")
 }
 
-model Skill {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  category    String
-  description String?
-  createdAt   DateTime @default(now())
+model SkillRequest {
+  id                  String   @id @default(cuid())
+  authorId            String
+  title               String
+  description         String
+  skillNeeded         String   // What skill they need
+  skillOffered        String   // What skill they're offering in return
+  category            String
+  estimatedDuration   String?  // e.g., "2 weeks", "1 month"
+  deadline            DateTime?
+  location            String?
+  isRemote            Boolean  @default(false)
+  requirements        String[] // Array of requirements
+  deliverables        String[] // What they expect to receive
+  tags                String[] // Tags for better searchability
+  status              SkillRequestStatus @default(OPEN)
+  acceptedApplicantId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  userSkills UserSkill[]
+  // Relations
+  author       User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  applications Application[]
+  views        SkillRequestView[]
 
-  @@map("skills")
+  @@map("skill_requests")
 }
 
-model UserSkill {
-  id     String @id @default(cuid())
-  userId String
-  skillId String
-  type   SkillType // OFFERED or WANTED
-  level  SkillLevel
-  yearsOfExperience Int?
-  description String?
+model Application {
+  id               String @id @default(cuid())
+  skillRequestId   String
+  applicantId      String
+  message          String
+  proposedTimeline String?
+  portfolio        String[] // URLs to portfolio items
+  experience       String?  // Relevant experience description
+  whyChooseMe      String?  // Why they should be chosen
+  status           ApplicationStatus @default(PENDING)
+  responseMessage  String?  // Response from the skill request author
+  respondedAt      DateTime?
+  startedAt        DateTime?    // When work actually started
+  completedAt      DateTime?    // When work was completed
+  createdAt        DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  // Relations
+  skillRequest SkillRequest @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
+  applicant    User @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  review       Review?      // Review after completion
 
-  @@unique([userId, skillId, type])
-  @@map("user_skills")
+  @@unique([skillRequestId, applicantId])
+  @@map("applications")
 }
 
-model ExchangeRequest {
-  id                String   @id @default(cuid())
-  teacherId         String
-  studentId         String
-  teacherSkillId    String
-  studentSkillId    String
-  status            ExchangeStatus @default(PENDING)
-  message           String?
-  proposedDuration  Int? // in minutes
-  scheduledAt       DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model SkillRequestView {
+  id              String @id @default(cuid())
+  userId          String
+  skillRequestId  String
+  viewedAt        DateTime @default(now())
 
-  teacher     User @relation("Teacher", fields: [teacherId], references: [id])
-  student     User @relation("Student", fields: [studentId], references: [id])
-  
-  review Review?
+  // Relations
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillRequest SkillRequest @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
 
-  @@map("exchange_requests")
+  @@unique([userId, skillRequestId])
+  @@map("skill_request_views")
 }
 
 model Review {
-  id         String @id @default(cuid())
-  exchangeId String @unique
-  giverId    String
-  receiverId String
-  rating     Int    @db.SmallInt
-  comment    String?
-  createdAt  DateTime @default(now())
+  id            String @id @default(cuid())
+  applicationId String @unique  // Link to completed application
+  giverId       String
+  receiverId    String
+  rating        Int    @db.SmallInt
+  comment       String?
+  createdAt     DateTime @default(now())
 
-  exchange ExchangeRequest @relation(fields: [exchangeId], references: [id])
-  giver    User @relation("ReviewGiver", fields: [giverId], references: [id])
-  receiver User @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  application Application @relation(fields: [applicationId], references: [id])
+  giver       User @relation("ReviewGiver", fields: [giverId], references: [id])
+  receiver    User @relation("ReviewReceiver", fields: [receiverId], references: [id])
 
   @@map("reviews")
 }
 
-enum SkillType {
-  OFFERED
-  WANTED
+// Keep only the enums you need
+enum SkillRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  CLOSED
 }
 
-enum SkillLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
-}
-
-enum ExchangeStatus {
+enum ApplicationStatus {
   PENDING
   ACCEPTED
   REJECTED
-  SCHEDULED
+  WITHDRAWN
+  IN_PROGRESS
   COMPLETED
-  CANCELLED
 }

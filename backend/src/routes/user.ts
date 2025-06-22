@@ -22,65 +22,69 @@ interface AuthenticatedRequest extends Request {
 // @ts-ignore
 router.get('/profile', authenticateToken, async (req: AuthenticatedRequest,res: Response) => {
   try {
-    const userProfile = await db.user.findUnique({
+    const userProfile = await db.user.findFirst({
       where: { id: req.user?.id },
       include: {
-        skillsOffered: {
+        // Include skill requests created by the user
+        skillRequests: {
           include: {
-            skill: {
+            applications: {
               select: {
                 id: true,
-                name: true,
-                category: true,
-                description: true
+                status: true,
+                applicant: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    username: true,
+                    avatar: true
+                  }
+                }
               }
-            }
-          }
-        },
-        exchangesAsTeacher: {
-          select: {
-            id: true,
-            status: true,
-            createdAt: true,
-            student: {
+            },
+            _count: {
               select: {
-                firstName: true,
-                lastName: true,
-                username: true,
-                avatar: true
+                applications: true,
+                views: true
               }
             }
           },
           orderBy: {
             createdAt: 'desc'
           },
-          take: 5
+          take: 10
         },
-        exchangesAsStudent: {
-          select: {
-            id: true,
-            status: true,
-            createdAt: true,
-            teacher: {
+        
+        // Include applications made by the user
+        applications: {
+          include: {
+            skillRequest: {
               select: {
-                firstName: true,
-                lastName: true,
-                username: true,
-                avatar: true
+                id: true,
+                title: true,
+                skillNeeded: true,
+                skillOffered: true,
+                status: true,
+                author: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    username: true,
+                    avatar: true
+                  }
+                }
               }
             }
           },
           orderBy: {
             createdAt: 'desc'
           },
-          take: 5
+          take: 10
         },
+        
+        // Include reviews received
         reviewsReceived: {
-          select: {
-            id: true,
-            rating: true,
-            comment: true,
-            createdAt: true,
+          include: {
             giver: {
               select: {
                 firstName: true,
@@ -88,15 +92,40 @@ router.get('/profile', authenticateToken, async (req: AuthenticatedRequest,res: 
                 username: true,
                 avatar: true
               }
+            },
+            application: {
+              select: {
+                skillRequest: {
+                  select: {
+                    title: true
+                  }
+                }
+              }
             }
           },
           orderBy: {
             createdAt: 'desc'
           },
           take: 5
+        },
+        
+        // Include skill request views for analytics
+        skillRequestViews: {
+          select: {
+            skillRequest: {
+              select: {
+                title: true
+              }
+            },
+            viewedAt: true
+          },
+          orderBy: {
+            viewedAt: 'desc'
+          },
+          take: 5
         }
       }
-    })
+})
     // Remove password from response?
     res.json(userProfile);
     }catch (error) {
@@ -152,7 +181,7 @@ router.put('/profile', authenticateToken, async (req: AuthenticatedRequest,res: 
   }
 });
 
-// Upload avatar
+// Upload avatar   -- Verify Later 
 router.post('/avatar', 
   authenticateToken, 
   upload.single('avatar'), 
@@ -226,6 +255,7 @@ router.get('/:identifier', async  (req: Request, res: Response) => {
   try {
     const { identifier } = req.params;
 
+
     // Check if identifier is a cuid (starts with 'c') or username
     const isId = identifier.startsWith('c');
     
@@ -242,18 +272,6 @@ router.get('/:identifier', async  (req: Request, res: Response) => {
         totalRatings: true,
         isVerified: true,
         createdAt: true,
-        skillsOffered: {
-          include: {
-            skill: {
-              select: {
-                id: true,
-                name: true,
-                category: true,
-                description: true
-              }
-            }
-          }
-        },
         reviewsReceived: {
           select: {
             id: true,
@@ -273,16 +291,6 @@ router.get('/:identifier', async  (req: Request, res: Response) => {
             createdAt: 'desc'
           },
           take: 10
-        },
-        _count: {
-          select: {
-            exchangesAsTeacher: {
-              where: { status: 'COMPLETED' }
-            },
-            exchangesAsStudent: {
-              where: { status: 'COMPLETED' }
-            }
-          }
         }
       }
     });

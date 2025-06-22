@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import zod from 'zod'
+
 import bcrypt from 'bcryptjs'
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken'
@@ -19,11 +19,11 @@ router.post('/register', async (req, res) => {
     const { username,email, password, firstName, lastName, location } = req.body;
 
     // Check if user already exists
-    const existingUser = await db.user.findUnique({
+    const existingUser = await db.user.findFirst({
         where:{
             OR: [
-          { email },
-          { username }
+          { email:email },
+          { username:username }
         ]
     }   
     });
@@ -38,6 +38,7 @@ router.post('/register', async (req, res) => {
     // Create new user
     const newUser = await db.user.create({
         data:{
+            username,
             email,
             password: hashedPassword,
             firstName,
@@ -45,17 +46,17 @@ router.post('/register', async (req, res) => {
             location,
             bio: '',
             rating: 0,
-            totalReviews: 0,
-            skillsOffered: [],
-            skillsWanted: [],
+            totalRatings: 0,
             createdAt: new Date(),
             isVerified: false
         }
     })
 
+    // verification Mail to be sent to user 
+
     // // Generate JWT token
     const token = jwt.sign(
-      { userId: newUser.id, email: newUser.email },
+      { id: newUser.id, email: newUser.email },
       process.env.JWT_SECRET || "Anything",
       { expiresIn: '24h' }
     );
@@ -72,7 +73,7 @@ router.post('/register', async (req, res) => {
 
 // Login User
 // @ts-ignore
-router.post('login', async (req, res) => {
+router.post('/login', async (req, res) => {
      const { emailOrUsername, password} = req.body;
 
     try {
@@ -98,15 +99,18 @@ router.post('login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: CurUser.id, email: CurUser.email },
+      { id: CurUser.id, email: CurUser.email },
       process.env.JWT_SECRET || "Anything",
       { expiresIn: '24h' }
     );
-
+    // Set the authentication token in the response header
+    res.setHeader('Authorization', `Bearer ${token}`);
+    
+    
     res.json({
       message: 'Login successful',
       token,
-      user: CurUser
+      user: CurUser //Don't send password in response
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error during login' });
