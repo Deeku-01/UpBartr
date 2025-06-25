@@ -32,10 +32,7 @@ export default function Hero() {
               Start Trading Skills
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-full font-semibold hover:border-emerald-500 hover:text-emerald-600 transition-all duration-300 flex items-center group">
-              <Play className="mr-2 w-5 h-5 group-hover:scale-110 transition-transform" />
-              Watch Demo
-            </button>
+           
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
