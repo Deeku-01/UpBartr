@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import skillsRoutes from './routes/application';
 import exchangeRoutes from './routes/exchange';
+import skillreqRouter from './routes/skillrequests';
 
 // // Import middleware
 // import { errorHandler } from './middleware/error.middleware';
@@ -25,6 +26,7 @@ app.use(cors());
 
 
 // Routes
+app.use('/api/skillreqs', skillreqRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/skills', skillsRoutes);

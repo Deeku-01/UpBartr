@@ -125,7 +125,7 @@ export default function SuccessStories() {
                   <span className="text-emerald-600 font-medium">Verified</span>
                 )}
                 {testimonial.topTrader && (
-                  <span className="text-purple-600 font-medium">Top Trader</span>
+                  <span className="text-purple-600 font-medium">Top Learner</span>
                 )}
               </div>
             </div>

@@ -10,12 +10,13 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <img src={myImage} alt='Upbartr' className="logo" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+            <img src={myImage} alt='Upbartr' className="logo" height={20} width={63}/>
+            {/* <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-lg flex items-center justify-center">
+              
+            </div> */}
+            {/* <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
               UpBartr
-            </span>
+            </span> */}
           </div>
           
           <div className="hidden md:flex items-center space-x-8">

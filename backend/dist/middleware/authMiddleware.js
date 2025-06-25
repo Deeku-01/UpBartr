@@ -21,7 +21,6 @@ const authenticateToken = (req, res, next) => {
             id: decoded.id,
             email: decoded.email
         };
-        console.log(decoded.id);
         next();
     }
     catch (err) {

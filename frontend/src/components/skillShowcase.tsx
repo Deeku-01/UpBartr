@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapPin, Star, ChevronRight, Clock, Users, Filter } from 'lucide-react';
+import axios from 'axios';
 
-const skillRequests = [
+
+
+const initialSkillRequests = [
   {
     id: 1,
     title: 'Need React Developer for Portfolio Website',
@@ -94,7 +97,7 @@ const skillRequests = [
   }
 ];
 
-const categories = [
+const initialCategories = [
   { name: 'All', icon: '🌟', count: 234 },
   { name: 'Technology', icon: '💻', count: 89 },
   { name: 'Creative', icon: '🎨', count: 67 },
@@ -106,10 +109,70 @@ const categories = [
 
 export default function SkillShowcase() {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [skillRequests, setSkillRequests] = useState(initialSkillRequests);
+  const [categories, setCategories] = useState(initialCategories);
+  const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const fetchSkillRequests = async () => {
+      setLoading(true);
+
+      try {
+        const response = await axios.get('http://localhost:3000/api/skillreqs/requests');
+        const fetchedSkills = response.data;
+
+        // Make sure fetchedSkills is an array
+        if (!Array.isArray(fetchedSkills)) {
+          console.warn('Fetched data is not an array:', fetchedSkills);
+          return;
+        }
+        
+        // Combine initial data with fetched data
+        const allSkills = [...initialSkillRequests, ...fetchedSkills];
+        setSkillRequests(fetchedSkills);
+        
+        // Update categories count based on all skills
+        const updatedCategories = initialCategories.map(category => {
+          if (category.name === 'All') {
+            return { ...category, count: allSkills.length };
+          }
+          return {
+            ...category,
+            count: allSkills.filter(skill => skill.category === category.name).length
+          };
+        });
+        
+        setCategories(updatedCategories);
+        
+      } catch (err) {
+        console.error("Error fetching skill requests:", err);
+        console.log("Failed to fetch skill requests");
+      }finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSkillRequests();
+  }, []); // Empty dependency array - runs once on mount
+
+ 
   const filteredSkills = selectedCategory === 'All' 
     ? skillRequests 
     : skillRequests.filter(skill => skill.category === selectedCategory);
+
+      // Show loading state
+  if (loading) {
+    return (
+      <section id="browse-skills" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading skill requests...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="browse-skills" className="py-20 bg-gray-50">
@@ -207,7 +270,7 @@ export default function SkillShowcase() {
                   ))}
                 </div>
                 
-                {/* Apply Button */}
+                {/* Apply Button -> onClick( "Transfer to application page that applies to the following skill trade") */}
                 <button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 text-white py-3 rounded-full font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 transform group-hover:scale-105 flex items-center justify-center">
                   Apply Now
                   <ChevronRight className="ml-2 w-4 h-4" />
@@ -216,9 +279,11 @@ export default function SkillShowcase() {
             </div>
           ))}
         </div>
+
+        {/* It should be redirected to a Page that can display  all the Skill requests in the backend */}
         
         <div className="text-center mt-12">
-          <button className="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-full font-semibold hover:bg-emerald-600 hover:text-white transition-all duration-300 flex items-center mx-auto">
+          <button className="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-full font-semibold hover:bg-emerald-600 hover:text-white transition-all duration-300 flex items-center mx-auto" onClick={()=> setSelectedCategory('All')}>
             <Filter className="mr-2 w-5 h-5" />
             View All Skill Requests
           </button>

@@ -20,62 +20,64 @@ router.get('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
         const userProfile = await db.user.findFirst({
             where: { id: req.user?.id },
             include: {
-                skillsOffered: {
+                // Include skill requests created by the user
+                skillRequests: {
                     include: {
-                        skill: {
+                        applications: {
                             select: {
                                 id: true,
-                                name: true,
-                                category: true,
-                                description: true
+                                status: true,
+                                applicant: {
+                                    select: {
+                                        firstName: true,
+                                        lastName: true,
+                                        username: true,
+                                        avatar: true
+                                    }
+                                }
                             }
-                        }
-                    }
-                },
-                exchangesAsTeacher: {
-                    select: {
-                        id: true,
-                        status: true,
-                        createdAt: true,
-                        student: {
+                        },
+                        _count: {
                             select: {
-                                firstName: true,
-                                lastName: true,
-                                username: true,
-                                avatar: true
+                                applications: true,
+                                views: true
                             }
                         }
                     },
                     orderBy: {
                         createdAt: 'desc'
                     },
-                    take: 5
+                    take: 10
                 },
-                exchangesAsStudent: {
-                    select: {
-                        id: true,
-                        status: true,
-                        createdAt: true,
-                        teacher: {
+                // Include applications made by the user
+                applications: {
+                    include: {
+                        skillRequest: {
                             select: {
-                                firstName: true,
-                                lastName: true,
-                                username: true,
-                                avatar: true
+                                id: true,
+                                title: true,
+                                skillNeeded: true,
+                                skillOffered: true,
+                                status: true,
+                                author: {
+                                    select: {
+                                        firstName: true,
+                                        lastName: true,
+                                        username: true,
+                                        avatar: true
+                                    }
+                                }
                             }
                         }
                     },
                     orderBy: {
                         createdAt: 'desc'
                     },
-                    take: 5
+                    take: 10
                 },
+                // Include reviews received
                 reviewsReceived: {
-                    select: {
-                        id: true,
-                        rating: true,
-                        comment: true,
-                        createdAt: true,
+                    include: {
                         giver: {
                             select: {
                                 firstName: true,
@@ -83,10 +85,34 @@ router.get('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
                                 username: true,
                                 avatar: true
                             }
+                        },
+                        application: {
+                            select: {
+                                skillRequest: {
+                                    select: {
+                                        title: true
+                                    }
+                                }
+                            }
                         }
                     },
                     orderBy: {
                         createdAt: 'desc'
+                    },
+                    take: 5
+                },
+                // Include skill request views for analytics
+                skillRequestViews: {
+                    select: {
+                        skillRequest: {
+                            select: {
+                                title: true
+                            }
+                        },
+                        viewedAt: true
+                    },
+                    orderBy: {
+                        viewedAt: 'desc'
                     },
                     take: 5
                 }
@@ -198,7 +224,6 @@ router.post('/avatar', authMiddleware_1.authenticateToken, uploadMiddleware_1.up
 router.get('/:identifier', async (req, res) => {
     try {
         const { identifier } = req.params;
-        console.log('Identifier:', identifier);
         // Check if identifier is a cuid (starts with 'c') or username
         const isId = identifier.startsWith('c');
         const user = await db.user.findUnique({
@@ -214,18 +239,6 @@ router.get('/:identifier', async (req, res) => {
                 totalRatings: true,
                 isVerified: true,
                 createdAt: true,
-                skillsOffered: {
-                    include: {
-                        skill: {
-                            select: {
-                                id: true,
-                                name: true,
-                                category: true,
-                                description: true
-                            }
-                        }
-                    }
-                },
                 reviewsReceived: {
                     select: {
                         id: true,
@@ -245,16 +258,6 @@ router.get('/:identifier', async (req, res) => {
                         createdAt: 'desc'
                     },
                     take: 10
-                },
-                _count: {
-                    select: {
-                        exchangesAsTeacher: {
-                            where: { status: 'COMPLETED' }
-                        },
-                        exchangesAsStudent: {
-                            where: { status: 'COMPLETED' }
-                        }
-                    }
                 }
             }
         });
