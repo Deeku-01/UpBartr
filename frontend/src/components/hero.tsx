@@ -1,5 +1,5 @@
 
-import { ArrowRight, Users, Shield, Zap, TrendingUp, Play } from 'lucide-react';
+import { ArrowRight, Users, Shield, Zap, TrendingUp} from 'lucide-react';
 
 export default function Hero() {
   return (

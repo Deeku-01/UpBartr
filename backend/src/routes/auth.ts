@@ -16,7 +16,7 @@ interface AuthenticatedRequest extends Request {
 // @ts-ignore
 router.post('/register', async (req, res) => {
   try {
-    const { username,email, password, firstName, lastName, location } = req.body;
+    const { username,email, password, firstName, lastName, location, bio } = req.body;
 
     // Check if user already exists
     const existingUser = await db.user.findFirst({
@@ -44,7 +44,7 @@ router.post('/register', async (req, res) => {
             firstName,
             lastName,
             location,
-            bio: '',
+            bio: bio || '',
             rating: 0,
             totalRatings: 0,
             createdAt: new Date(),

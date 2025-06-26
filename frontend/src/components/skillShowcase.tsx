@@ -1,3 +1,4 @@
+"use client"
 import { useEffect, useState } from 'react';
 import { MapPin, Star, ChevronRight, Clock, Users, Filter } from 'lucide-react';
 import axios from 'axios';
@@ -129,7 +130,7 @@ export default function SkillShowcase() {
         
         // Combine initial data with fetched data
         const allSkills = [...initialSkillRequests, ...fetchedSkills];
-        setSkillRequests(fetchedSkills);
+        setSkillRequests(allSkills);
         
         // Update categories count based on all skills
         const updatedCategories = initialCategories.map(category => {
@@ -205,7 +206,7 @@ export default function SkillShowcase() {
         
         {/* Skill Request Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredSkills.map((skill) => (
+          {filteredSkills.slice(0,9).map((skill) => (
             <div key={skill.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden group border border-gray-100">
               <div className="p-6">
                 {/* Header */}

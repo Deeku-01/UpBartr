@@ -1,9 +1,13 @@
+"use client"
+
 import  { useState } from 'react';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import myImage from '../assets/UpBartr.jpg'
+import SignupModal from './SignUp';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSignupOpen, setIsSignupOpen] = useState(false)
 
   return (
     <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 z-50">
@@ -24,7 +28,7 @@ export default function Header() {
             <a href="#browse-skills" className="text-gray-600 hover:text-emerald-600 transition-colors">Browse Skills</a>
             <a href="#success-stories" className="text-gray-600 hover:text-emerald-600 transition-colors">Success Stories</a>
             <button className="text-gray-600 hover:text-emerald-600 transition-colors">Sign In</button>
-            <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-2 rounded-full hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center group">
+            <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-2 rounded-full hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center group" onClick={() => setIsSignupOpen(true)}>
               Get Started
               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
@@ -47,12 +51,14 @@ export default function Header() {
             <a href="#browse-skills" className="block py-2 text-gray-600">Browse Skills</a>
             <a href="#success-stories" className="block py-2 text-gray-600">Success Stories</a>
             <button className="block py-2 text-gray-600">Sign In</button>
-            <button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 text-white py-2 rounded-full mt-4">
+            <button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 text-white py-2 rounded-full mt-4"  onClick={() => setIsSignupOpen(true)}>
               Get Started
             </button>
           </div>
         </div>
       )}
+      {/* Signup Modal */}
+      <SignupModal isOpen={isSignupOpen} onClose={() => setIsSignupOpen(false)} />
     </nav>
   );
 }
