@@ -9,13 +9,20 @@ import { Textarea } from "./ui/textarea"
 import { Checkbox } from "./ui/checkbox"
 import { Eye, EyeOff, Mail, User, MapPin, Lock } from "lucide-react"
 import axios from "axios"
+import { setAuthToken } from "./utils/setAuthToken"
 
 interface SignupModalProps {
   isOpen: boolean
   onClose: () => void
+  onSwitchToSignin?: () => void
 }
 
-export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
+interface ResponseData{
+    message: string
+    token: string
+}
+
+export default function SignupModal({ isOpen, onClose, onSwitchToSignin }: SignupModalProps) {
   const [step, setStep] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -45,6 +52,13 @@ export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
     if (step > 1) setStep(step - 1)
   }
 
+  const handleSwitchToSignin = () => {
+    onClose()
+    if (onSwitchToSignin) {
+      onSwitchToSignin()
+    }
+  }
+
   const handleSubmit = async () => {
   console.log("=== FORM SUBMISSION START ===")
   console.log("Form Data:", formData)
@@ -54,14 +68,13 @@ export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
   // Optional: Show alert to confirm submission
   alert("Account created successfully! Welcome to UpBartr!")
     // Here you would typically send formData to your backend API
-    axios.post("http://localhost:3000/api/auth/register", formData)
-      .then((response) => {
-        console.log("Signup successful:", response.data)
-        // Handle successful signup (e.g., show success message, redirect, etc.)
-      })
+    const data:ResponseData = await axios.post("http://localhost:3000/api/auth/register", formData).then((response) => {
+        return response.data})
       .catch((error) => {
         console.error("Signup error:", error)
       })
+
+    setAuthToken(data.token)
   
     // Close modal after successful signup
     onClose()
@@ -307,11 +320,11 @@ export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
             </div>
           )}
 
-          {/* Sign In Link */}
+        {/* Sign In Link */}
           <div className="text-center mt-6 pt-4 border-t">
             <p className="text-sm text-gray-600">
               Already have an account?{" "}
-              <button onClick={onClose} className="text-blue-600 hover:underline font-medium">
+              <button onClick={handleSwitchToSignin} className="text-blue-600 hover:underline font-medium">
                 Sign in instead
               </button>
             </p>
