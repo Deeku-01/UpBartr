@@ -159,109 +159,560 @@ const sampleUsers = [
 ];
 
 const sampleSkillRequests = [
+  // Tech & Development
   {
-    title: 'Need React Developer for Portfolio Website',
-    description: 'Looking for an experienced React developer to help me build a modern portfolio website. I have the designs ready and need someone to bring them to life with clean, responsive code.',
-    skillNeeded: 'React Development',
-    skillOffered: 'Professional Photography Session',
-    category: 'Technology',
-    estimatedDuration: '2 weeks',
-    location: 'Austin, TX',
+    title: "Need React Developer for E-commerce Frontend",
+    description: "I'm building an online marketplace and need help creating a modern, responsive frontend using React and TypeScript. The project includes product listings, shopping cart, user authentication, and payment integration.",
+    skillNeeded: "React Development",
+    skillOffered: "UI/UX Design",
+    category: "Technology",
+    estimatedDuration: "6 weeks",
+    deadline: new Date('2024-03-15'),
+    location: "San Francisco, CA",
     isRemote: true,
-    requirements: ['React experience', 'TypeScript knowledge', 'Responsive design skills'],
-    deliverables: ['Fully functional portfolio website', 'Mobile responsive design', 'Clean, documented code'],
-    tags: ['react', 'typescript', 'frontend', 'portfolio']
+    requirements: [
+      "3+ years React experience",
+      "TypeScript proficiency",
+      "Experience with state management (Redux/Zustand)",
+      "Knowledge of REST APIs",
+      "Responsive design skills"
+    ],
+    deliverables: [
+      "Complete React frontend application",
+      "Responsive design for mobile/desktop",
+      "Integration with backend APIs",
+      "Unit tests for components",
+      "Documentation"
+    ],
+    tags: ["react", "typescript", "frontend", "ecommerce", "javascript"],
+    status: "OPEN"
   },
   {
-    title: 'Learn Digital Marketing Strategies',
-    description: 'I want to learn modern digital marketing techniques including SEO, social media marketing, and content strategy. Looking for hands-on guidance and practical tips.',
-    skillNeeded: 'Digital Marketing',
-    skillOffered: 'Web Development (Full Stack)',
-    category: 'Business',
-    estimatedDuration: '1 month',
-    location: 'San Francisco, CA',
+    title: "Python Backend API Development",
+    description: "Looking for a Python developer to help build a RESTful API for a social media analytics platform. Need expertise in FastAPI, PostgreSQL, and data processing.",
+    skillNeeded: "Python Backend Development",
+    skillOffered: "Data Analysis & Visualization",
+    category: "Technology",
+    estimatedDuration: "4 weeks",
+    deadline: new Date('2024-02-28'),
+    location: "Remote",
     isRemote: true,
-    requirements: ['Proven marketing results', 'Experience with SEO tools', 'Social media expertise'],
-    deliverables: ['Marketing strategy document', '4 weekly mentoring sessions', 'Campaign setup guidance'],
-    tags: ['marketing', 'seo', 'social-media', 'strategy']
+    requirements: [
+      "Strong Python skills",
+      "FastAPI or Django experience",
+      "PostgreSQL database knowledge",
+      "API design best practices",
+      "Docker containerization"
+    ],
+    deliverables: [
+      "Complete REST API",
+      "Database schema design",
+      "API documentation",
+      "Docker deployment setup",
+      "Unit and integration tests"
+    ],
+    tags: ["python", "fastapi", "backend", "api", "postgresql"],
+    status: "OPEN"
   },
   {
-    title: 'Spanish Conversation Practice Partner',
-    description: 'Seeking a native Spanish speaker for regular conversation practice. I\'m intermediate level and want to improve my fluency and confidence in speaking.',
-    skillNeeded: 'Spanish Language Tutoring',
-    skillOffered: 'Guitar Lessons',
-    category: 'Language',
-    estimatedDuration: '3 months',
-    location: 'Seattle, WA',
+    title: "Mobile App Development - Flutter",
+    description: "Need help developing a cross-platform mobile app for fitness tracking. The app should include workout logging, progress tracking, and social features.",
+    skillNeeded: "Flutter Development",
+    skillOffered: "Fitness Coaching & Program Design",
+    category: "Technology",
+    estimatedDuration: "8 weeks",
+    deadline: new Date('2024-04-01'),
+    location: "Austin, TX",
     isRemote: true,
-    requirements: ['Native Spanish speaker', 'Teaching experience preferred', 'Patient and encouraging'],
-    deliverables: ['Weekly 1-hour conversation sessions', 'Pronunciation feedback', 'Cultural insights'],
-    tags: ['spanish', 'language', 'conversation', 'tutoring']
+    requirements: [
+      "Flutter/Dart proficiency",
+      "Mobile app architecture knowledge",
+      "State management (Bloc/Provider)",
+      "Firebase integration experience",
+      "App store deployment experience"
+    ],
+    deliverables: [
+      "Complete Flutter mobile app",
+      "iOS and Android builds",
+      "Firebase backend integration",
+      "App store ready builds",
+      "User documentation"
+    ],
+    tags: ["flutter", "mobile", "dart", "firebase", "fitness"],
+    status: "OPEN"
+  },
+
+  // Design & Creative
+  {
+    title: "Brand Identity Design for Tech Startup",
+    description: "Looking for a talented graphic designer to create a complete brand identity for my AI-powered productivity app. Need logo, color palette, typography, and brand guidelines.",
+    skillNeeded: "Brand Identity Design",
+    skillOffered: "Digital Marketing Strategy",
+    category: "Design",
+    estimatedDuration: "3 weeks",
+    deadline: new Date('2024-02-20'),
+    location: "New York, NY",
+    isRemote: true,
+    requirements: [
+      "Strong portfolio in brand design",
+      "Experience with tech/startup branding",
+      "Proficiency in Adobe Creative Suite",
+      "Understanding of modern design trends",
+      "Ability to create scalable brand systems"
+    ],
+    deliverables: [
+      "Logo design (multiple variations)",
+      "Brand color palette",
+      "Typography system",
+      "Brand guidelines document",
+      "Business card and letterhead designs"
+    ],
+    tags: ["branding", "logo", "design", "startup", "identity"],
+    status: "OPEN"
   },
   {
-    title: 'Brand Identity Design for Startup',
-    description: 'Need a talented graphic designer to create a complete brand identity for my tech startup. This includes logo, color palette, typography, and brand guidelines.',
-    skillNeeded: 'Graphic Design & Branding',
-    skillOffered: 'Business Strategy Consulting',
-    category: 'Creative',
-    estimatedDuration: '3 weeks',
-    location: 'Miami, FL',
+    title: "Website Redesign - Modern & Minimalist",
+    description: "My consulting business needs a complete website redesign. Looking for someone who can create a modern, minimalist design that converts visitors into clients.",
+    skillNeeded: "Web Design",
+    skillOffered: "Business Consulting",
+    category: "Design",
+    estimatedDuration: "4 weeks",
+    deadline: new Date('2024-03-10'),
+    location: "Chicago, IL",
     isRemote: true,
-    requirements: ['Portfolio of brand work', 'Adobe Creative Suite expertise', 'Understanding of tech industry'],
-    deliverables: ['Logo design', 'Brand guidelines document', 'Business card design', 'Social media templates'],
-    tags: ['branding', 'logo', 'design', 'startup']
+    requirements: [
+      "Strong web design portfolio",
+      "UX/UI design experience",
+      "Figma or Sketch proficiency",
+      "Understanding of conversion optimization",
+      "Responsive design expertise"
+    ],
+    deliverables: [
+      "Complete website design mockups",
+      "Mobile responsive designs",
+      "Style guide and components",
+      "Prototype/wireframes",
+      "Design handoff files"
+    ],
+    tags: ["webdesign", "ux", "ui", "figma", "consulting"],
+    status: "OPEN"
   },
   {
-    title: 'Personal Fitness Training Program',
-    description: 'Looking for a certified personal trainer to help me create a custom workout routine and provide ongoing coaching. Want to focus on strength training and overall fitness.',
-    skillNeeded: 'Personal Training',
-    skillOffered: 'Photography Lessons',
-    category: 'Health',
-    estimatedDuration: '2 months',
-    location: 'Denver, CO',
+    title: "Product Photography for E-commerce",
+    description: "Need professional product photography for my handmade jewelry business. Looking for someone who can create stunning, consistent product images for online sales.",
+    skillNeeded: "Product Photography",
+    skillOffered: "Jewelry Making & Design",
+    category: "Design",
+    estimatedDuration: "2 weeks",
+    deadline: new Date('2024-02-15'),
+    location: "Los Angeles, CA",
     isRemote: false,
-    requirements: ['Certified personal trainer', 'Experience with strength training', 'Motivational coaching style'],
-    deliverables: ['Custom workout plan', 'Weekly training sessions', 'Nutrition guidance', 'Progress tracking'],
-    tags: ['fitness', 'training', 'health', 'strength']
+    requirements: [
+      "Professional photography equipment",
+      "Product photography experience",
+      "Photo editing skills (Lightroom/Photoshop)",
+      "Understanding of e-commerce requirements",
+      "Portfolio of product photography"
+    ],
+    deliverables: [
+      "50+ high-quality product photos",
+      "Edited and retouched images",
+      "Multiple angles per product",
+      "Consistent lighting and style",
+      "Web-optimized image files"
+    ],
+    tags: ["photography", "product", "ecommerce", "jewelry", "editing"],
+    status: "OPEN"
   },
+
+  // Marketing & Business
   {
-    title: 'Learn Music Production Basics',
-    description: 'Interested in learning music production and audio engineering. Want to understand DAWs, mixing, and mastering techniques for electronic music.',
-    skillNeeded: 'Music Production',
-    skillOffered: 'Cooking Classes (Italian Cuisine)',
-    category: 'Music',
-    estimatedDuration: '6 weeks',
-    location: 'Nashville, TN',
+    title: "Social Media Marketing Strategy",
+    description: "Looking for a social media expert to help grow my fitness coaching business on Instagram and TikTok. Need content strategy, posting schedule, and engagement tactics.",
+    skillNeeded: "Social Media Marketing",
+    skillOffered: "Personal Training & Nutrition Coaching",
+    category: "Marketing",
+    estimatedDuration: "6 weeks",
+    deadline: new Date('2024-03-20'),
+    location: "Miami, FL",
     isRemote: true,
-    requirements: ['Professional music production experience', 'Knowledge of Ableton or Logic Pro', 'Electronic music background'],
-    deliverables: ['Introduction to DAW software', 'Basic mixing techniques', 'Sample project creation', 'Equipment recommendations'],
-    tags: ['music', 'production', 'audio', 'electronic']
+    requirements: [
+      "Proven social media growth experience",
+      "Content creation skills",
+      "Understanding of fitness/wellness niche",
+      "Analytics and reporting abilities",
+      "Knowledge of Instagram and TikTok algorithms"
+    ],
+    deliverables: [
+      "Complete social media strategy",
+      "Content calendar (3 months)",
+      "Hashtag research and strategy",
+      "Engagement growth plan",
+      "Monthly analytics reports"
+    ],
+    tags: ["socialmedia", "marketing", "instagram", "tiktok", "fitness"],
+    status: "OPEN"
   },
   {
-    title: 'Woodworking Workshop for Beginners',
-    description: 'Complete beginner looking to learn basic woodworking skills. Interested in making simple furniture pieces and understanding wood selection and tools.',
-    skillNeeded: 'Woodworking',
-    skillOffered: 'Website Development',
-    category: 'Crafts',
-    estimatedDuration: '1 month',
-    location: 'Portland, OR',
-    isRemote: false,
-    requirements: ['Experienced woodworker', 'Own workshop space', 'Patient teaching style'],
-    deliverables: ['Basic tool usage training', 'Wood selection guidance', 'Complete a simple project', 'Safety training'],
-    tags: ['woodworking', 'crafts', 'furniture', 'beginner']
+    title: "SEO Optimization for Local Business",
+    description: "My restaurant needs help with local SEO to attract more customers. Looking for someone to optimize our website, Google My Business, and local search presence.",
+    skillNeeded: "SEO & Local Search Optimization",
+    skillOffered: "Culinary Training & Recipe Development",
+    category: "Marketing",
+    estimatedDuration: "5 weeks",
+    deadline: new Date('2024-03-05'),
+    location: "Portland, OR",
+    isRemote: true,
+    requirements: [
+      "Local SEO expertise",
+      "Google My Business optimization experience",
+      "Keyword research skills",
+      "Technical SEO knowledge",
+      "Restaurant/hospitality industry experience preferred"
+    ],
+    deliverables: [
+      "Complete SEO audit",
+      "Optimized Google My Business profile",
+      "Local keyword strategy",
+      "Website SEO improvements",
+      "Monthly progress reports"
+    ],
+    tags: ["seo", "local", "restaurant", "google", "optimization"],
+    status: "OPEN"
   },
   {
-    title: 'Advanced Photography Techniques',
-    description: 'Experienced amateur photographer looking to learn advanced techniques including studio lighting, portrait photography, and post-processing workflows.',
-    skillNeeded: 'Advanced Photography',
-    skillOffered: 'Digital Marketing Consultation',
-    category: 'Creative',
-    estimatedDuration: '4 weeks',
-    location: 'Los Angeles, CA',
+    title: "Email Marketing Campaign Setup",
+    description: "Need help setting up automated email marketing campaigns for my online course business. Looking for someone experienced with email automation and copywriting.",
+    skillNeeded: "Email Marketing & Automation",
+    skillOffered: "Online Course Creation & Teaching",
+    category: "Marketing",
+    estimatedDuration: "3 weeks",
+    deadline: new Date('2024-02-25'),
+    location: "Remote",
+    isRemote: true,
+    requirements: [
+      "Email marketing platform experience (Mailchimp, ConvertKit, etc.)",
+      "Marketing automation setup",
+      "Email copywriting skills",
+      "A/B testing experience",
+      "Analytics and optimization knowledge"
+    ],
+    deliverables: [
+      "Complete email automation sequences",
+      "Welcome series (5-7 emails)",
+      "Sales funnel email campaigns",
+      "Email templates and designs",
+      "Performance tracking setup"
+    ],
+    tags: ["email", "marketing", "automation", "copywriting", "courses"],
+    status: "OPEN"
+  },
+
+  // Education & Language
+  {
+    title: "Spanish Language Tutoring",
+    description: "Looking for a native Spanish speaker to help me become conversational in Spanish for business purposes. Need structured lessons and conversation practice.",
+    skillNeeded: "Spanish Language Tutoring",
+    skillOffered: "English Language Tutoring",
+    category: "Education",
+    estimatedDuration: "12 weeks",
+    deadline: new Date('2024-05-01'),
+    location: "Denver, CO",
+    isRemote: true,
+    requirements: [
+      "Native or near-native Spanish fluency",
+      "Teaching or tutoring experience",
+      "Business Spanish knowledge",
+      "Structured lesson planning abilities",
+      "Patience and communication skills"
+    ],
+    deliverables: [
+      "Customized learning curriculum",
+      "Weekly 1-hour lessons",
+      "Homework assignments and materials",
+      "Progress assessments",
+      "Business Spanish conversation practice"
+    ],
+    tags: ["spanish", "language", "tutoring", "business", "conversation"],
+    status: "OPEN"
+  },
+  {
+    title: "Piano Lessons for Adult Beginner",
+    description: "Adult beginner looking for patient piano instructor to teach classical and contemporary pieces. Prefer someone who can work with busy professional schedule.",
+    skillNeeded: "Piano Instruction",
+    skillOffered: "Financial Planning & Investment Advice",
+    category: "Education",
+    estimatedDuration: "16 weeks",
+    deadline: new Date('2024-06-01'),
+    location: "Boston, MA",
+    isRemote: true,
+    requirements: [
+      "Piano teaching experience",
+      "Adult education experience preferred",
+      "Flexible scheduling",
+      "Classical and contemporary repertoire knowledge",
+      "Online lesson capability"
+    ],
+    deliverables: [
+      "Structured lesson plans",
+      "Weekly 45-minute lessons",
+      "Practice exercises and sheet music",
+      "Progress evaluations",
+      "Performance preparation"
+    ],
+    tags: ["piano", "music", "lessons", "adult", "classical"],
+    status: "OPEN"
+  },
+  {
+    title: "Data Science Mentoring",
+    description: "Career changer looking for a data science mentor to guide me through machine learning concepts, portfolio projects, and job search preparation.",
+    skillNeeded: "Data Science Mentoring",
+    skillOffered: "Project Management & Agile Coaching",
+    category: "Education",
+    estimatedDuration: "10 weeks",
+    deadline: new Date('2024-04-15'),
+    location: "Seattle, WA",
+    isRemote: true,
+    requirements: [
+      "Professional data science experience",
+      "Machine learning expertise",
+      "Python and R proficiency",
+      "Portfolio development guidance",
+      "Industry insights and networking"
+    ],
+    deliverables: [
+      "Personalized learning roadmap",
+      "Weekly mentoring sessions",
+      "Portfolio project guidance",
+      "Resume and interview preparation",
+      "Industry networking introductions"
+    ],
+    tags: ["datascience", "mentoring", "machinelearning", "python", "career"],
+    status: "OPEN"
+  },
+
+  // Health & Wellness
+  {
+    title: "Nutrition Coaching for Athletes",
+    description: "Competitive runner looking for sports nutrition coaching to optimize performance and recovery. Need meal planning and supplement guidance.",
+    skillNeeded: "Sports Nutrition Coaching",
+    skillOffered: "Running Training & Coaching",
+    category: "Health",
+    estimatedDuration: "8 weeks",
+    deadline: new Date('2024-03-30'),
+    location: "Phoenix, AZ",
+    isRemote: true,
+    requirements: [
+      "Sports nutrition certification",
+      "Endurance athlete experience",
+      "Meal planning expertise",
+      "Supplement knowledge",
+      "Performance optimization focus"
+    ],
+    deliverables: [
+      "Personalized nutrition plan",
+      "Weekly meal prep guides",
+      "Supplement recommendations",
+      "Performance tracking",
+      "Race day nutrition strategy"
+    ],
+    tags: ["nutrition", "sports", "running", "performance", "coaching"],
+    status: "OPEN"
+  },
+  {
+    title: "Yoga Instruction for Beginners",
+    description: "Looking for a patient yoga instructor to teach basic poses and breathing techniques. Prefer someone experienced with beginners and injury modifications.",
+    skillNeeded: "Yoga Instruction",
+    skillOffered: "Massage Therapy",
+    category: "Health",
+    estimatedDuration: "6 weeks",
+    deadline: new Date('2024-03-15'),
+    location: "San Diego, CA",
+    isRemote: true,
+    requirements: [
+      "Certified yoga instructor",
+      "Beginner-friendly teaching style",
+      "Injury modification knowledge",
+      "Hatha or gentle yoga specialization",
+      "Online class capability"
+    ],
+    deliverables: [
+      "Beginner yoga curriculum",
+      "Weekly 1-hour classes",
+      "Pose modification guides",
+      "Breathing exercise instruction",
+      "Home practice routines"
+    ],
+    tags: ["yoga", "beginner", "wellness", "breathing", "flexibility"],
+    status: "OPEN"
+  },
+
+  // Creative & Arts
+  {
+    title: "Pottery Wheel Throwing Lessons",
+    description: "Complete beginner wanting to learn pottery wheel throwing techniques. Looking for hands-on instruction and guidance on clay preparation and glazing.",
+    skillNeeded: "Pottery & Ceramics Instruction",
+    skillOffered: "Woodworking & Furniture Making",
+    category: "Arts",
+    estimatedDuration: "8 weeks",
+    deadline: new Date('2024-04-01'),
+    location: "Asheville, NC",
     isRemote: false,
-    requirements: ['Professional photographer', 'Studio experience', 'Lightroom/Photoshop expertise'],
-    deliverables: ['Studio lighting workshop', 'Portrait session practice', 'Post-processing tutorials', 'Portfolio review'],
-    tags: ['photography', 'portrait', 'lighting', 'advanced']
+    requirements: [
+      "Professional pottery experience",
+      "Teaching experience preferred",
+      "Access to pottery studio/wheel",
+      "Kiln firing knowledge",
+      "Glazing technique expertise"
+    ],
+    deliverables: [
+      "Basic wheel throwing techniques",
+      "Clay preparation instruction",
+      "8 completed pottery pieces",
+      "Glazing and firing guidance",
+      "Studio practice time"
+    ],
+    tags: ["pottery", "ceramics", "art", "handson", "creative"],
+    status: "OPEN"
+  },
+  {
+    title: "Digital Illustration for Children's Book",
+    description: "Author seeking digital illustrator for a children's picture book about friendship. Need 15-20 colorful, engaging illustrations that appeal to ages 4-8.",
+    skillNeeded: "Digital Illustration",
+    skillOffered: "Creative Writing & Storytelling",
+    category: "Arts",
+    estimatedDuration: "6 weeks",
+    deadline: new Date('2024-03-25'),
+    location: "Remote",
+    isRemote: true,
+    requirements: [
+      "Children's book illustration experience",
+      "Digital art proficiency (Procreate, Photoshop, etc.)",
+      "Colorful, engaging art style",
+      "Character design skills",
+      "Print-ready file preparation"
+    ],
+    deliverables: [
+      "15-20 full-page illustrations",
+      "Character design sheets",
+      "Cover illustration",
+      "Print-ready high-resolution files",
+      "Revision rounds included"
+    ],
+    tags: ["illustration", "childrens", "digital", "book", "art"],
+    status: "OPEN"
+  },
+
+  // Lifestyle & Personal
+  {
+    title: "Home Organization & Decluttering",
+    description: "Need help organizing and decluttering my home office and bedroom. Looking for someone with experience in space optimization and minimalist principles.",
+    skillNeeded: "Home Organization",
+    skillOffered: "Interior Design Consultation",
+    category: "Lifestyle",
+    estimatedDuration: "2 weeks",
+    deadline: new Date('2024-02-20'),
+    location: "Nashville, TN",
+    isRemote: false,
+    requirements: [
+      "Professional organizing experience",
+      "Space optimization skills",
+      "Decluttering methodology",
+      "Storage solution knowledge",
+      "Before/after documentation"
+    ],
+    deliverables: [
+      "Complete room organization",
+      "Decluttering action plan",
+      "Storage system setup",
+      "Maintenance guidelines",
+      "Before/after photos"
+    ],
+    tags: ["organization", "decluttering", "home", "minimalist", "space"],
+    status: "OPEN"
+  },
+  {
+    title: "Personal Styling & Wardrobe Consultation",
+    description: "Professional looking to update wardrobe for new executive role. Need help with style assessment, shopping guidance, and outfit coordination.",
+    skillNeeded: "Personal Styling",
+    skillOffered: "Career Coaching & Resume Writing",
+    category: "Lifestyle",
+    estimatedDuration: "4 weeks",
+    deadline: new Date('2024-03-01'),
+    location: "Atlanta, GA",
+    isRemote: false,
+    requirements: [
+      "Personal styling certification or experience",
+      "Professional wardrobe expertise",
+      "Color analysis knowledge",
+      "Shopping and budget guidance",
+      "Executive presence understanding"
+    ],
+    deliverables: [
+      "Style assessment and analysis",
+      "Wardrobe audit and recommendations",
+      "Personal shopping session",
+      "Outfit coordination guide",
+      "Seasonal wardrobe plan"
+    ],
+    tags: ["styling", "wardrobe", "professional", "fashion", "executive"],
+    status: "OPEN"
+  },
+
+  // Technical Skills
+  {
+    title: "3D Modeling for Product Prototyping",
+    description: "Inventor needs help creating 3D models of a new kitchen gadget for prototyping and manufacturing. Need expertise in CAD software and design for manufacturing.",
+    skillNeeded: "3D Modeling & CAD Design",
+    skillOffered: "Product Development & Innovation Consulting",
+    category: "Technology",
+    estimatedDuration: "5 weeks",
+    deadline: new Date('2024-03-10'),
+    location: "Remote",
+    isRemote: true,
+    requirements: [
+      "Professional CAD software experience (SolidWorks, Fusion 360)",
+      "Product design background",
+      "Manufacturing considerations knowledge",
+      "3D printing preparation",
+      "Technical drawing skills"
+    ],
+    deliverables: [
+      "Complete 3D product model",
+      "Technical drawings and specifications",
+      "3D printing ready files",
+      "Manufacturing considerations report",
+      "Design iteration rounds"
+    ],
+    tags: ["3dmodeling", "cad", "product", "prototyping", "manufacturing"],
+    status: "OPEN"
+  },
+  {
+    title: "Video Editing for YouTube Channel",
+    description: "Educational content creator needs help editing weekly YouTube videos. Looking for someone who can create engaging edits with graphics, transitions, and audio optimization.",
+    skillNeeded: "Video Editing",
+    skillOffered: "Educational Content Creation & Curriculum Design",
+    category: "Technology",
+    estimatedDuration: "Ongoing",
+    deadline: null,
+    location: "Remote",
+    isRemote: true,
+    requirements: [
+      "Professional video editing experience",
+      "YouTube content optimization knowledge",
+      "Motion graphics skills",
+      "Audio editing and enhancement",
+      "Fast turnaround capability"
+    ],
+    deliverables: [
+      "Weekly edited YouTube videos (10-15 minutes)",
+      "Custom intro/outro graphics",
+      "Thumbnail design templates",
+      "Audio optimization and cleanup",
+      "SEO-optimized video descriptions"
+    ],
+    tags: ["videoediting", "youtube", "content", "graphics", "education"],
+    status: "OPEN"
   }
 ];
 

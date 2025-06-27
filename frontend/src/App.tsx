@@ -1,22 +1,37 @@
 
-import Header from './components/Header';
-import Hero from './components/hero';
-import HowItWorks from './components/howitworks';
-import SkillShowcase from './components/skillShowcase';
-import SuccessStories from './components/successStories';
-import Footer from './components/Footer';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import LandingPage from './pages/LandingPage';
+import Dashboard from './pages/DashBoard';
+import { useEffect } from 'react';
+
+// Create a separate component for the navigation logic
+function AppContent() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      navigate('/dashboard'); // User is logged in
+    } else {
+      navigate('/'); // User not logged in - redirect to root
+    }
+  }, []);
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/dashboard/*" element={<Dashboard />} />
+    </Routes>
+  );
+}
 
 
 function App() {
+
   return (
-    <div className="min-h-screen bg-white">
-      <Header />
-      <Hero />
-      <HowItWorks />
-      <SkillShowcase />
-      <SuccessStories />
-      <Footer />
-    </div>
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 

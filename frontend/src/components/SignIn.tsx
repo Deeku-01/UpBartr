@@ -11,6 +11,7 @@ import { Checkbox } from "./ui/checkbox"
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
 import axios from "axios"
 import { setAuthToken } from "./utils/setAuthToken"
+import { useNavigate } from "react-router-dom"
 
 interface SigninModalProps {
   isOpen: boolean
@@ -19,6 +20,8 @@ interface SigninModalProps {
 }
 
 export default function SigninModal({ isOpen, onClose, onSwitchToSignup }: SigninModalProps) {
+    const navigate=useNavigate();
+
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -52,13 +55,16 @@ export default function SigninModal({ isOpen, onClose, onSwitchToSignup }: Signi
         // Handle successful login
         console.log("Login successful:", data)
         
-        setAuthToken(data.token)
+        setAuthToken(data.token,data.user.id)
 
         // redirect to home page or dashboard
+        navigate("/dashboard")
+
+
       }else{
         throw new Error("Login failed. Please check your credentials.")
       }
-      
+
       
       // For demo purposes, simulate success
       onClose()

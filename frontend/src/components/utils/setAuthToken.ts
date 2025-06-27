@@ -8,16 +8,18 @@ const api = axios.create({
 // Function to set token
 // Call the function with token to set the token or null to remove it
 
-const setAuthToken = (token: string | null) => {
-  if (token) {
+const setAuthToken = (token: string | null,userId:string|null) => {
+  if (token && userId) {
     // Set default header for all requests
     const authtoken= `Bearer ${token}`
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`
     localStorage.setItem('authToken', authtoken)
+    localStorage.setItem('userId', userId)
   } else {
     // Remove header
     delete api.defaults.headers.common['Authorization']
     localStorage.removeItem('authToken')
+    localStorage.removeItem('userId')
   }
 }
 
@@ -41,7 +43,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
-      setAuthToken(null)
+      setAuthToken(null,null)
       // Redirect to login or show login modal
       window.location.href = '/login'
     }

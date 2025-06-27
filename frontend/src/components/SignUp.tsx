@@ -20,6 +20,17 @@ interface SignupModalProps {
 interface ResponseData{
     message: string
     token: string
+    user:{
+        id: string
+        firstName: string
+        lastName: string
+        email: string
+        username: string
+        location?: string
+        bio?: string
+        skillsOffered?: string
+        skillsWanted?: string
+    }
 }
 
 export default function SignupModal({ isOpen, onClose, onSwitchToSignin }: SignupModalProps) {
@@ -74,7 +85,7 @@ export default function SignupModal({ isOpen, onClose, onSwitchToSignin }: Signu
         console.error("Signup error:", error)
       })
 
-    setAuthToken(data.token)
+    setAuthToken(data.token,data.user.id)
   
     // Close modal after successful signup
     onClose()
