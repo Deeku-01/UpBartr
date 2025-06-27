@@ -161,9 +161,9 @@ router.get('/my-applications', authenticateToken, async (req, res) => {
 
     let whereClause: any = { applicantId: req.user!.id };
 
-    if (status && status !== 'ALL') {
-      whereClause.status = status;
-    }
+    // if (status && status !== 'ALL') {
+    //   whereClause.status = status;
+    // }
 
     const [applications, totalCount] = await Promise.all([
       db.application.findMany({

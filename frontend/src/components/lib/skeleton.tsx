@@ -17,3 +17,13 @@ export default function SkeletonCard() {
     </div>
   )
 }
+
+export function SkeletonCardReq() {
+  return (
+   <div className="min-h-screen w-full color-gray-300 p-4 ">
+      <Skeleton className="h-[200px] w-full rounded-xl" />
+                <br></br>
+      <Skeleton className="h-[200px] w-full rounded-xl" />
+    </div>
+  )
+}

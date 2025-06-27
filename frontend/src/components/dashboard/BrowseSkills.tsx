@@ -144,13 +144,13 @@ const initialSkillRequests = [
 ];
 
 const initialCategories = [
-  { name: 'All', icon: '🌟', count: 234 },
-  { name: 'Technology', icon: '💻', count: 89 },
-  { name: 'Creative', icon: '🎨', count: 67 },
-  { name: 'Business', icon: '💼', count: 45 },
-  { name: 'Language', icon: '🗣️', count: 34 },
-  { name: 'Health', icon: '💪', count: 28 },
-  { name: 'Music', icon: '🎵', count: 21 }
+  { name: 'All', icon: '🌟', count: 23 },
+  { name: 'Technology', icon: '💻', count: 5},
+  { name: 'Creative', icon: '🎨', count: 7 },
+  { name: 'Business', icon: '💼', count: 4 },
+  { name: 'Language', icon: '🗣️', count: 4 },
+  { name: 'Health', icon: '💪', count: 8 },
+  { name: 'Music', icon: '🎵', count: 1 }
 ];
 
 export default function BrowseSkills() {

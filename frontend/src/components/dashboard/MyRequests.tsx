@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
   Plus, 
   Eye, 
@@ -13,52 +14,53 @@ import {
   FileText
 } from 'lucide-react';
 
-const mockRequests = [
-  {
-    id: 1,
-    title: 'Need React Developer for Portfolio Website',
-    description: 'Looking for an experienced React developer to help me build a modern portfolio website...',
-    skillNeeded: 'React Development',
-    skillOffered: 'Professional Photography',
-    category: 'Technology',
-    status: 'OPEN',
-    applications: 12,
-    views: 89,
-    createdAt: '2024-01-15',
-    deadline: '2024-02-15',
-    isRemote: true
-  },
-  {
-    id: 2,
-    title: 'Looking for Spanish Conversation Partner',
-    description: 'Seeking a native Spanish speaker for regular conversation practice...',
-    skillNeeded: 'Spanish Tutoring',
-    skillOffered: 'Guitar Lessons',
-    category: 'Language',
-    status: 'IN_PROGRESS',
-    applications: 6,
-    views: 34,
-    createdAt: '2024-01-10',
-    deadline: '2024-03-10',
-    isRemote: true,
-    acceptedApplicant: 'David Park'
-  },
-  {
-    id: 3,
-    title: 'Digital Marketing Strategy Help',
-    description: 'Need help developing a comprehensive digital marketing strategy...',
-    skillNeeded: 'Digital Marketing',
-    skillOffered: 'Web Development',
-    category: 'Business',
-    status: 'COMPLETED',
-    applications: 8,
-    views: 56,
-    createdAt: '2023-12-20',
-    deadline: '2024-01-20',
-    isRemote: true,
-    acceptedApplicant: 'Elena Rodriguez'
-  }
-];
+
+import {SkeletonCardReq} from '../lib/skeleton';
+
+interface Application {
+  id: number;
+  status: string;
+  skillRequest: {
+    id: number;
+    title: string;
+    description: string;
+    skillNeeded: string;
+    skillOffered: string;
+    category: string;
+    status: string;
+    createdAt: string;
+    author: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      username: string;
+      avatar: string;
+      rating: number;
+    };
+  };
+  review?: {
+    id: number;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  };
+}
+
+interface TransformedRequest {
+  id: number;
+  title: string;
+  description: string;
+  skillNeeded: string;
+  skillOffered: string;
+  category: string;
+  status: string;
+  applications: number;
+  views: number;
+  createdAt: string;
+  deadline: string;
+  isRemote: boolean;
+  acceptedApplicant?: string;
+}
 
 const statusColors = {
   OPEN: 'bg-green-100 text-green-800',
@@ -71,17 +73,107 @@ const statusColors = {
 export default function MyRequests() {
   const [selectedTab, setSelectedTab] = useState('all');
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  const [requests, setRequests] = useState<TransformedRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Transform backend response to frontend format
+  const transformApplicationsToRequests = (applications: Application[]): TransformedRequest[] => {
+    return applications.map(app => ({
+      id: app.skillRequest.id,
+      title: app.skillRequest.title,
+      description: app.skillRequest.description,
+      skillNeeded: app.skillRequest.skillNeeded,
+      skillOffered: app.skillRequest.skillOffered,
+      category: app.skillRequest.category,
+      status: app.skillRequest.status,
+      applications: 0, // You'll need to get this from another endpoint or include in backend
+      views: 0, // You'll need to get this from another endpoint or include in backend
+      createdAt: app.skillRequest.createdAt,
+      deadline: app.skillRequest.createdAt, // Adjust this based on your data structure
+      isRemote: true, // Adjust this based on your data structure
+      acceptedApplicant: app.skillRequest.status === 'IN_PROGRESS' || app.skillRequest.status === 'COMPLETED' 
+        ? `${app.skillRequest.author.firstName} ${app.skillRequest.author.lastName}` 
+        : undefined
+    }));
+  };
+
+  // Fetch applications from API
+  const fetchMyApplications = async (status: string = 'ALL') => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem('authToken'); // Adjust based on how you store the token
+      
+      const response = await axios.get('http://localhost:3000/api/skills/my-applications', {
+        headers: {
+          'authorization': `${token}`
+        },
+        params: {
+          status: status,
+          page: 1,
+          limit: 11, // Adjust as needed
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        }
+      });
+
+      const transformedRequests = transformApplicationsToRequests(response.data.applications);
+      setRequests(transformedRequests);
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+      setError('Failed to fetch applications. Please try again.');
+    } finally {
+      const promise = await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on component mount and when tab changes
+
+  useEffect(() => {
+    // Always fetch all data first, then filter on frontend
+    fetchMyApplications('ALL');
+  }, [selectedTab]);
 
   const tabs = [
-    { id: 'all', name: 'All Requests', count: mockRequests.length },
-    { id: 'open', name: 'Open', count: mockRequests.filter(r => r.status === 'OPEN').length },
-    { id: 'in_progress', name: 'In Progress', count: mockRequests.filter(r => r.status === 'IN_PROGRESS').length },
-    { id: 'completed', name: 'Completed', count: mockRequests.filter(r => r.status === 'COMPLETED').length }
+    { id: 'all', name: 'All Requests', count: requests.length },
+    { id: 'open', name: 'Open', count: requests.filter(r => r.status === 'OPEN').length },
+    { id: 'in_progress', name: 'In Progress', count: requests.filter(r => r.status === 'IN_PROGRESS').length },
+    { id: 'completed', name: 'Completed', count: requests.filter(r => r.status === 'COMPLETED').length }
   ];
 
   const filteredRequests = selectedTab === 'all' 
-    ? mockRequests 
-    : mockRequests.filter(r => r.status.toLowerCase() === selectedTab);
+    ? requests 
+    : requests.filter(r => r.status.toLowerCase() === selectedTab);
+
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">My Skill Requests</h1>
+            <p className="text-gray-600 mt-1">Manage your posted skill requests and track applications</p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-12 h-12 text-red-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Requests</h3>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button 
+            onClick={() => fetchMyApplications()}
+            className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -91,10 +183,6 @@ export default function MyRequests() {
           <h1 className="text-2xl font-bold text-gray-900">My Skill Requests</h1>
           <p className="text-gray-600 mt-1">Manage your posted skill requests and track applications</p>
         </div>
-        <button className="mt-4 sm:mt-0 bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 flex items-center">
-          <Plus className="w-5 h-5 mr-2" />
-          Create New Request
-        </button>
       </div>
 
       {/* Tabs */}
@@ -119,7 +207,19 @@ export default function MyRequests() {
         </nav>
       </div>
 
+      {/* loading Skeleton *5 */}
+      {loading && (
+        <div>
+          {Array.from({ length: 2 }).map((_, index) => (
+            <SkeletonCardReq key={index} />
+          ))}
+
+        </div>
+      )}
+
+
       {/* Requests List */}
+      {!loading &&(
       <div className="space-y-4">
         {filteredRequests.map((request) => (
           <div key={request.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
@@ -170,7 +270,7 @@ export default function MyRequests() {
                   </div>
                   <div className="flex items-center">
                     <Clock className="w-4 h-4 mr-1" />
-                    Deadline: {new Date(request.deadline).toLocaleDateString()}
+                    Created: {new Date(request.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               </div>
@@ -219,8 +319,9 @@ export default function MyRequests() {
           </div>
         ))}
       </div>
+      )}
 
-      {filteredRequests.length === 0 && (
+      {filteredRequests.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileText className="w-12 h-12 text-gray-400" />
