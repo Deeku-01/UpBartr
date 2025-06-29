@@ -8,6 +8,7 @@ import BrowseSkills from '../components/dashboard/BrowseSkills';
 import Messages from '../components/dashboard/Messages';
 import Profile from '../components/dashboard/Profile';
 import CreateRequest from '../components/dashboard/CreateRequests';
+import Settings from '@/components/dashboard/Settings';
 
 export default function Dashboard() {
   return (
@@ -21,6 +22,7 @@ export default function Dashboard() {
         <Route path="messages" element={<Messages />} />
         <Route path="profile" element={<Profile />} />
         <Route path="create-request" element={<CreateRequest />} />
+        <Route path="settings" element={<Settings />} />
       </Routes>
     </DashboardLayout>
   );

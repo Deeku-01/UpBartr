@@ -14,6 +14,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import ThemeToggle from '../ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -21,7 +22,7 @@ const navigation = [
   { name: 'My Applications', href: '/dashboard/my-applications', icon: Send },
   { name: 'Browse Skills', href: '/dashboard/browse', icon: Search },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageCircle },
-  { name: 'Profile', href: '/dashboard/profile', icon: User },
+  // { name: 'Profile', href: '/dashboard/profile', icon: User },
 ];
 
 interface DashboardLayoutProps {
@@ -69,8 +70,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </button>
         </div>
 
-        {/* User info */}
-        <div className="p-6 border-b border-gray-200 flex-shrink-0">
+        {/* User info -> should navigate to his profile once clicked*/}
+        <div className="p-6 border-b border-gray-200 flex-shrink-0 cursor-pointer" onClick={()=> location.pathname !== '/dashboard/profile' && (window.location.href = '/dashboard/profile')}>
           <div className="flex items-center">
             <img
               src={currentUser.avatar}
@@ -107,7 +108,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Bottom actions - Fixed at bottom */}
         <div className="p-4 border-t border-gray-200 space-y-2 flex-shrink-0 bg-white">
-          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg">
+          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg" onClick={() => window.location.href = '/dashboard/settings'}>
             <Settings className="w-5 h-5 mr-3" />
             Settings
           </button>
@@ -121,7 +122,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Top bar - Fixed */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
+        <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               className="lg:hidden"
@@ -143,6 +144,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Bell className="w-6 h-6" />
                 <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
+
+              <ThemeToggle size="md" />
             </div>
           </div>
         </div>

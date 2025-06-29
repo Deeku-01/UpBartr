@@ -93,12 +93,12 @@ export default function DashboardHome() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                <p className="text-sm text-emerald-600 mt-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.name}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stat.value}</p>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
                   {stat.change} this week
                 </p>
               </div>
@@ -112,39 +112,39 @@ export default function DashboardHome() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+                <div key={activity.id} className="flex items-start space-x-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                   <img
                     src={activity.avatar}
                     alt=""
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
-                    <p className="text-xs text-gray-400 mt-2">{activity.time}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.title}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{activity.description}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{activity.time}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <button className="w-full mt-4 text-center text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+            <button className="w-full mt-4 text-center text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium">
               View all activity
             </button>
           </div>
         </div>
 
         {/* Active Requests */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="p-6 border-b border-gray-100">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Your Active Requests</h2>
-              <button className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Your Active Requests</h2>
+              <button className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium">
                 View all
               </button>
             </div>
@@ -152,9 +152,9 @@ export default function DashboardHome() {
           <div className="p-6">
             <div className="space-y-4">
               {activeRequests.map((request) => (
-                <div key={request.id} className="border border-gray-200 rounded-lg p-4 hover:border-emerald-200 transition-colors">
-                  <h3 className="font-medium text-gray-900 mb-3">{request.title}</h3>
-                  <div className="flex items-center justify-between text-sm text-gray-600">
+                <div key={request.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors">
+                  <h3 className="font-medium text-gray-900 dark:text-white mb-3">{request.title}</h3>
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center">
                         <Users className="w-4 h-4 mr-1" />
@@ -178,37 +178,37 @@ export default function DashboardHome() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-colors">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-emerald-200 hover:bg-emerald-50 transition-colors group">
+          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-emerald-200 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mr-3">
-                <FileText className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center mr-3">
+                <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <span className="font-medium text-gray-900">Create New Request</span>
+              <span className="font-medium text-gray-900 dark:text-white">Create New Request</span>
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
           </button>
           
-          <button className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-200 hover:bg-blue-50 transition-colors group">
+          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                <Users className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="font-medium text-gray-900">Browse Skills</span>
+              <span className="font-medium text-gray-900 dark:text-white">Browse Skills</span>
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
           </button>
           
-          <button className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-purple-200 hover:bg-purple-50 transition-colors group">
+          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-purple-200 dark:hover:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors group">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                <Star className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mr-3">
+                <Star className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-              <span className="font-medium text-gray-900">Update Profile</span>
+              <span className="font-medium text-gray-900 dark:text-white">Update Profile</span>
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600" />
+            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400" />
           </button>
         </div>
       </div>
