@@ -84,7 +84,7 @@ export default function DashboardHome() {
           <button className="bg-white text-emerald-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
             Review Applications
           </button>
-          <button className="border border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors">
+          <button className="border border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors" onClick={()=> window.location.href='/dashboard/browse'}>
             Browse New Skills
           </button>
         </div>
@@ -181,7 +181,7 @@ export default function DashboardHome() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-colors">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-emerald-200 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group">
+          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-emerald-200 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group" onClick={()=> window.location.href='/dashboard/create-request'}>
             <div className="flex items-center">
               <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center mr-3">
                 <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -191,12 +191,12 @@ export default function DashboardHome() {
             <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
           </button>
           
-          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group">
+          <button className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group"  onClick={()=> window.location.href='/dashboard/browse'}>
             <div className="flex items-center">
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
                 <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="font-medium text-gray-900 dark:text-white">Browse Skills</span>
+              <span className="font-medium text-gray-900 dark:text-white" >Browse Skills</span>
             </div>
             <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
           </button>

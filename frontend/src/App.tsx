@@ -1,39 +1,43 @@
-
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/DashBoard';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 // Create a separate component for the navigation logic
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const hasInitialized = useRef(false);
 
-   useEffect(() => {
+  useEffect(() => {
     // Only run this logic once on initial load
-    if (hasInitialized) return;
+    if (hasInitialized.current) return;
 
     const token = localStorage.getItem('authToken');
     const currentPath = location.pathname;
-
+    
+    // Check if this is truly the initial app load (not a refresh)
+    const isInitialLoad = !sessionStorage.getItem('appHasLoaded');
+    
     if (token) {
       // User is logged in
-      if (currentPath === '/') {
-        // Only redirect to dashboard if they're at the root
-        navigate('/dashboard/profile');
+      if (currentPath === '/' && isInitialLoad) {
+        // Only redirect to dashboard on initial app load at root
+        navigate('/dashboard/profile', { replace: true });
       }
-      // Otherwise, stay on whatever page they're currently on (handles refresh)
+      // If it's a refresh at '/' or any other path, stay where they are
     } else {
       // User not logged in - redirect to root only if they're on a protected route
       if (currentPath.startsWith('/dashboard')) {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     }
 
-    setHasInitialized(true);
-  }, [navigate, location.pathname, hasInitialized]);
+    // Mark that the app has loaded in this session
+    sessionStorage.setItem('appHasLoaded', 'true');
+    hasInitialized.current = true;
+  }, [navigate, location.pathname]);
 
   return (
     <Routes>
@@ -43,9 +47,7 @@ function AppContent() {
   );
 }
 
-
 function App() {
-
   return (
     <ThemeProvider>
       <Router>
