@@ -377,6 +377,7 @@ router.post('/avatar', authMiddleware_1.authenticateToken, uploadMiddleware_1.up
         res.status(500).json({ error: 'Failed to upload avatar' });
     }
 });
+// For public View ->
 // @ts-ignore
 router.get('/:identifier', async (req, res) => {
     try {
@@ -384,35 +385,33 @@ router.get('/:identifier', async (req, res) => {
         const isId = identifier.startsWith('c');
         const user = await db.user.findUnique({
             where: isId ? { id: identifier } : { username: identifier },
-            include: {
-                skills: true,
-                interests: true,
+            select: {
+                id: true,
+                email: true,
+                avatar: true,
+                firstName: true, // This matches your schema
+                lastName: true, // Add this too
+                rating: true,
+                // You could calculate completed trades from reviews or applications
                 reviewsReceived: {
-                    select: {
-                        id: true,
-                        rating: true,
-                        comment: true,
-                        createdAt: true,
-                        giver: {
-                            select: {
-                                firstName: true,
-                                lastName: true,
-                                username: true,
-                                avatar: true
-                            }
-                        }
-                    },
-                    orderBy: {
-                        createdAt: 'desc'
-                    },
-                    take: 10
+                    select: { id: true } // Just count them
                 }
             }
         });
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json(user);
+        // Transform the response to include calculated fields
+        const response = {
+            id: user.id,
+            email: user.email,
+            avatar: user.avatar,
+            firstName: user.firstName, // Keep original case
+            fullName: `${user.firstName} ${user.lastName}`, // Add full name
+            rating: user.rating,
+            completedTrades: user.reviewsReceived.length, // Calculate from reviews
+        };
+        res.json(response);
     }
     catch (error) {
         console.error('Get user error:', error);

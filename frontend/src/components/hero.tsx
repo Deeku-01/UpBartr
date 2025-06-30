@@ -1,7 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowRight, Users, Shield, Zap, TrendingUp, Play } from 'lucide-react';
+import SigninModal from './SignIn';
+
+
 
 export default function Hero() {
+   const authToken = localStorage.getItem('authToken');
+
+   const [isSigninOpen, setIsSigninOpen] = useState(false);
+
+const handleClick = (authToken:string | null ) => {
+  console.log(authToken)
+  if (authToken) {
+    window.location.href = '/dashboard/browse';
+  } else {
+    setIsSigninOpen(true);
+  }
+};
+
   return (
     <section className="pt-24 pb-16 bg-gradient-to-br from-emerald-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 relative overflow-hidden transition-colors">
       {/* Background decoration */}
@@ -28,14 +44,11 @@ export default function Hero() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-8 py-4 rounded-full font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center group shadow-lg">
+            <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-8 py-4 rounded-full font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center group shadow-lg" onClick={() => handleClick(authToken)}>
               Start Trading Skills
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-8 py-4 rounded-full font-semibold hover:border-emerald-500 hover:text-emerald-600 dark:hover:border-emerald-400 dark:hover:text-emerald-400 transition-all duration-300 flex items-center group">
-              <Play className="mr-2 w-5 h-5 group-hover:scale-110 transition-transform" />
-              Watch Demo
-            </button>
+
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -63,6 +76,17 @@ export default function Hero() {
           </div>
         </div>
       </div>
+
+{/* Signin Modal */}
+      <SigninModal
+        isOpen={isSigninOpen}
+        onClose={() => setIsSigninOpen(false)}
+        onSwitchToSignup={() => {return}}
+      />
+
+
     </section>
+
+    
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -15,6 +15,7 @@ import {
   X
 } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
+import axios from 'axios';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -28,18 +29,77 @@ const navigation = [
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
-
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const currentUser = {
+ const currentUser = {
     name: 'Sarah Chen',
     email: 'sarah.chen@example.com',
     avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
     rating: 4.9,
     completedTrades: 23
   };
+
+  interface CurrentUserInput{
+    name:string,
+    email:string,
+    avatar:string,
+    rating:number,
+    completedTrades:number
+  }
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [curuser,setcurUser] =useState<CurrentUserInput>(currentUser);
+  const [loading, setLoading] = useState(true);
+
+
+  const fetchUserProfile = async () => {
+  try {
+    setLoading(true);
+    const token = localStorage.getItem('authToken');
+    const userId = localStorage.getItem('userId');
+    
+    console.log('Fetching user profile for ID:', userId); // Debug log
+    
+    const response = await axios.get(`http://localhost:3000/api/users/${userId}`, {
+      headers: { 
+        'Authorization': `${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('Response:', response.data); // Debug log
+    
+    if (response.status !== 200) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = response.data;
+    
+    // Transform the data to ensure all required fields exist
+    const transformedData = {
+      name: data.firstName || data.fullName || 'Unknown', // Use correct field name from schema
+      email: data.email || '',
+      avatar: data.avatar || '',
+      rating: data.rating || 0,
+      completedTrades: data.completedTrades || 0 // Use actual calculated data
+    };
+    
+    console.log('Transformed data:', transformedData); // Debug log
+    setcurUser(transformedData);
+    
+  } catch (error) { 
+    console.error('Error fetching user profile:', error);
+    console.error('Error details:', error); // More detailed error logging
+    // Keep the default profile data if fetch fails
+  }finally{
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchUserProfile();
+}, []);
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -71,19 +131,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* User info -> should navigate to his profile once clicked*/}
-        <div className="p-6 border-b border-gray-200 flex-shrink-0 cursor-pointer" onClick={()=> location.pathname !== '/dashboard/profile' && (window.location.href = '/dashboard/profile')}>
+        {!loading && ( <div className="p-6 border-b border-gray-200 flex-shrink-0 cursor-pointer" onClick={()=> location.pathname !== '/dashboard/profile' && (window.location.href = '/dashboard/profile')}>
           <div className="flex items-center">
             <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
+              src={curuser.avatar}
+              alt={curuser.name}
               className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-100"
             />
             <div className="ml-3">
-              <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
-              <p className="text-xs text-gray-600">⭐ {currentUser.rating} • {currentUser.completedTrades} trades</p>
+              <p className="text-sm font-semibold text-gray-900">{curuser.name}</p>
+              <p className="text-xs text-gray-600">⭐ {curuser.rating} • {curuser.completedTrades} trades</p>
             </div>
           </div>
         </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-2">
