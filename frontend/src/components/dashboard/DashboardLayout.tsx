@@ -112,7 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Settings className="w-5 h-5 mr-3" />
             Settings
           </button>
-          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg">
+          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg" onClick={() => {localStorage.clear(); window.location.href = '/'}}>
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out
           </button>

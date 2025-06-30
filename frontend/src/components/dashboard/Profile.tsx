@@ -1,4 +1,4 @@
-import  { useState } from 'react';
+import  { useEffect, useState } from 'react';
 import { 
   Camera, 
   Edit, 
@@ -83,10 +83,32 @@ const recentReviews = [
 ];
 
 export default function Profile() {
+  const [curuser, setUser] = useState(userProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(userProfile);
   const [newSkill, setNewSkill] = useState({ name: '', level: 'Beginner', category: 'Technology' });
   const [showAddSkill, setShowAddSkill] = useState(false);
+
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch(`/api/users/profile`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      const data = await response.json();
+      setUser(data);
+      setEditedProfile(data);
+    } catch (error) { 
+      console.error('Error fetching user profile:', error);
+    }
+  };  
+
+
+  useEffect(() => {
+    fetchUserProfile()
+  },[])
+
 
   const handleSave = () => {
     // Save profile logic here
