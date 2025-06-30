@@ -132,9 +132,9 @@ router.get('/my-applications', authMiddleware_1.authenticateToken, async (req, r
         const skip = (page - 1) * limit;
         const take = limit;
         let whereClause = { applicantId: req.user.id };
-        if (status && status !== 'ALL') {
-            whereClause.status = status;
-        }
+        // if (status && status !== 'ALL') {
+        //   whereClause.status = status;
+        // }
         const [applications, totalCount] = await Promise.all([
             db.application.findMany({
                 where: whereClause,

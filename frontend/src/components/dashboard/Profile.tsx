@@ -1,4 +1,4 @@
-import  { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Camera, 
   Edit, 
@@ -11,6 +11,7 @@ import {
   X,
   Save
 } from 'lucide-react';
+import axios from 'axios';
 
 const userProfile = {
   id: 1,
@@ -26,6 +27,13 @@ const userProfile = {
   completedTrades: 23,
   isVerified: true,
   joinedAt: '2023-06-15',
+  // skills: [],
+  // interests: [],
+  // achievements: [
+  //   { name: 'Top Trader', description: 'Completed 20+ successful skill exchanges', icon: Award },
+  //   { name: 'Verified Expert', description: 'Skills verified by the community', icon: CheckCircle },
+  //   { name: 'Mentor', description: 'Helped 50+ people learn new skills', icon: Star }
+  // ]
   skills: [
     { name: 'React Development', level: 'Expert', category: 'Technology' },
     { name: 'Node.js', level: 'Expert', category: 'Technology' },
@@ -88,31 +96,92 @@ export default function Profile() {
   const [editedProfile, setEditedProfile] = useState(userProfile);
   const [newSkill, setNewSkill] = useState({ name: '', level: 'Beginner', category: 'Technology' });
   const [showAddSkill, setShowAddSkill] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const fetchUserProfile = async () => {
     try {
-      const response = await fetch(`/api/users/profile`);
-      if (!response.ok) {
+      setLoading(true);
+      const token = localStorage.getItem('authToken'); // Adjust based on how you store the token
+      
+      const response = await axios.get('http://localhost:3000/api/users/profile',{
+        headers: { 
+          'Authorization': `${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response) {
         throw new Error('Failed to fetch user profile');
       }
-      const data = await response.json();
-      setUser(data);
-      setEditedProfile(data);
+      
+      const data = await response.data;
+      
+      // Transform the data to ensure all required fields exist
+      const transformedData = {
+        ...data,
+        joinedAt: data.joinedAt || data.createdAt,
+        skills: data.skills || [],
+        interests: data.interests || [],
+        achievements: data.achievements || []
+      };
+      
+      setUser(transformedData);
+      setEditedProfile(transformedData);
     } catch (error) { 
       console.error('Error fetching user profile:', error);
+      // Keep the default profile data if fetch fails
+    } finally {
+      setLoading(false);
     }
   };  
 
-
   useEffect(() => {
-    fetchUserProfile()
-  },[])
+    fetchUserProfile();
+  }, []);
 
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          firstName: editedProfile.firstName,
+          lastName: editedProfile.lastName,
+          bio: editedProfile.bio,
+          location: editedProfile.location,
+          skills: editedProfile.skills,
+          interests: editedProfile.interests
+        })
+      });
 
-  const handleSave = () => {
-    // Save profile logic here
-    setIsEditing(false);
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const data = await response.json();
+      
+      // Update the current user state with the response
+      setUser(prev => ({
+        ...prev,
+        ...data.user,
+        skills: editedProfile.skills,
+        interests: editedProfile.interests
+      }));
+      
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddSkill = () => {
@@ -126,12 +195,20 @@ export default function Profile() {
     }
   };
 
-  const removeSkill = (index: number) => {
+  const removeSkill = (index:number) => {
     setEditedProfile({
       ...editedProfile,
       skills: editedProfile.skills.filter((_, i) => i !== index)
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -143,10 +220,17 @@ export default function Profile() {
         </div>
         <button
           onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-          className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 flex items-center"
+          disabled={saving}
+          className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 flex items-center disabled:opacity-50"
         >
-          {isEditing ? <Save className="w-5 h-5 mr-2" /> : <Edit className="w-5 h-5 mr-2" />}
-          {isEditing ? 'Save Changes' : 'Edit Profile'}
+          {saving ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+          ) : isEditing ? (
+            <Save className="w-5 h-5 mr-2" />
+          ) : (
+            <Edit className="w-5 h-5 mr-2" />
+          )}
+          {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Edit Profile'}
         </button>
       </div>
 
@@ -312,7 +396,7 @@ export default function Profile() {
             )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {editedProfile.skills.map((skill, index) => (
+              {editedProfile.skills?.map((skill, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <h4 className="font-medium text-gray-900">{skill.name}</h4>
@@ -338,7 +422,7 @@ export default function Profile() {
 
           {/* Recent Reviews */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Reviews</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Views</h3>
             <div className="space-y-4">
               {recentReviews.map((review) => (
                 <div key={review.id} className="border-b border-gray-100 pb-4 last:border-b-0">
@@ -390,7 +474,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Skills I Want to Learn */}
+          {/* Skills I Want to Learn
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Skills I Want to Learn</h3>
             <div className="space-y-2">
@@ -403,7 +487,7 @@ export default function Profile() {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Quick Stats */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

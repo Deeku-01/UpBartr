@@ -35,7 +35,42 @@ model User {
   reviewsGiven      Review[] @relation("ReviewGiver")
   reviewsReceived   Review[] @relation("ReviewReceiver")
 
+  // Skills and interests relationships
+  skills            UserSkill[]
+  interests         UserInterest[]
+
   @@map("users")
+}
+
+model UserSkill {
+  id          String     @id @default(cuid())
+  userId      String
+  name        String
+  level       SkillLevel
+  category    String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("user_skills")
+}
+
+model UserInterest {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("user_interests")
 }
 
 model SkillRequest {
@@ -121,7 +156,14 @@ model Review {
   @@map("reviews")
 }
 
-// Keep only the enums you need
+// Enums
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
 enum SkillRequestStatus {
   OPEN
   IN_PROGRESS

@@ -3,16 +3,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// Import necessary modules
 const express_1 = require("express");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const uploadMiddleware_1 = require("../middleware/uploadMiddleware");
-// Local imports
 const client_1 = require("@prisma/client");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const router = (0, express_1.Router)();
 const db = new client_1.PrismaClient();
+// interface UserSkill{
+//   userId:string
+//   name:String
+//   level:SkillLevel
+// }
 // Get user profile
 // @ts-ignore
 router.get('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
@@ -20,6 +23,18 @@ router.get('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
         const userProfile = await db.user.findFirst({
             where: { id: req.user?.id },
             include: {
+                // Include user's skills
+                skills: {
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                },
+                // Include user's interests
+                interests: {
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                },
                 // Include skill requests created by the user
                 skillRequests: {
                     include: {
@@ -118,46 +133,131 @@ router.get('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
                 }
             }
         });
-        // Remove password from response?
-        res.json(userProfile);
+        if (!userProfile) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Calculate completed trades
+        const completedTrades = userProfile.applications.filter(app => app.skillRequest.status === 'COMPLETED').length;
+        // Calculate average rating
+        const totalRating = userProfile.reviewsReceived.reduce((sum, review) => sum + review.rating, 0);
+        const rating = userProfile.reviewsReceived.length > 0
+            ? (totalRating / userProfile.reviewsReceived.length)
+            : 0;
+        // Transform the data to match frontend expectations
+        const transformedProfile = {
+            id: userProfile.id,
+            firstName: userProfile.firstName,
+            lastName: userProfile.lastName,
+            username: userProfile.username,
+            email: userProfile.email,
+            avatar: userProfile.avatar,
+            bio: userProfile.bio,
+            location: userProfile.location,
+            rating: Number(rating.toFixed(1)),
+            totalRatings: userProfile.reviewsReceived.length,
+            completedTrades: completedTrades,
+            isVerified: userProfile.isVerified,
+            joinedAt: userProfile.createdAt,
+            // Use actual skills from database
+            skills: userProfile.skills.map(skill => ({
+                name: skill.name,
+                level: skill.level,
+                category: skill.category
+            })),
+            // Use actual interests from database
+            interests: userProfile.interests.map(interest => ({
+                name: interest.name,
+                category: interest.category
+            })),
+            // Calculate achievements based on actual data
+            achievements: [
+                {
+                    name: 'Top Trader',
+                    description: `Completed ${completedTrades}+ successful skill exchanges`,
+                    icon: 'Award'
+                },
+                {
+                    name: 'Verified Expert',
+                    description: 'Skills verified by the community',
+                    icon: 'CheckCircle'
+                },
+                {
+                    name: 'Mentor',
+                    description: `Helped ${userProfile.applications.length}+ people learn new skills`,
+                    icon: 'Star'
+                }
+            ],
+            // Include the raw data for dashboard/analytics
+            skillRequests: userProfile.skillRequests,
+            applications: userProfile.applications,
+            reviewsReceived: userProfile.reviewsReceived,
+            skillRequestViews: userProfile.skillRequestViews
+        };
+        res.json(transformedProfile);
     }
     catch (error) {
         console.error('Error fetching user profile:', error);
         return res.status(500).json({ error: 'Failed to fetch user profile' });
     }
 });
-// Update user profile
+// Update user profile (including skills and interests)
 router.put('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
     try {
-        const { firstName, lastName, bio, avatar, location } = req.body;
-        const updatedUser = await db.user.update({
-            where: { id: req.user?.id },
-            data: {
-                firstName: firstName || undefined,
-                lastName: lastName || undefined,
-                bio: bio !== undefined ? bio : undefined,
-                location: location !== undefined ? location : undefined,
-                avatar: avatar !== undefined ? avatar : undefined,
-                updatedAt: new Date()
-            },
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                bio: true,
-                avatar: true,
-                location: true,
-                rating: true,
-                totalRatings: true,
-                isVerified: true,
-                updatedAt: true
+        const { firstName, lastName, bio, avatar, location, skills, interests } = req.body;
+        // Start a transaction to update user and skills/interests
+        const result = await db.$transaction(async (prisma) => {
+            // Update basic user info
+            const updatedUser = await prisma.user.update({
+                where: { id: req.user?.id },
+                data: {
+                    firstName: firstName || undefined,
+                    lastName: lastName || undefined,
+                    bio: bio !== undefined ? bio : undefined,
+                    location: location !== undefined ? location : undefined,
+                    avatar: avatar !== undefined ? avatar : undefined,
+                    updatedAt: new Date()
+                }
+            });
+            // Update skills if provided
+            if (skills && Array.isArray(skills)) {
+                // Delete existing skills
+                await prisma.userSkill.deleteMany({
+                    where: { userId: req.user?.id }
+                });
+                // Create new skills
+                if (skills.length > 0) {
+                    await prisma.userSkill.createMany({
+                        data: skills.map((skill) => ({
+                            userId: req.user.id,
+                            name: skill.name,
+                            level: skill.level.toUpperCase(),
+                            category: skill.category
+                        }))
+                    });
+                }
             }
+            // Update interests if provided
+            if (interests && Array.isArray(interests)) {
+                // Delete existing interests
+                await prisma.userInterest.deleteMany({
+                    where: { userId: req.user?.id }
+                });
+                // Create new interests
+                if (interests.length > 0) {
+                    await prisma.userInterest.createMany({
+                        data: interests.map((interest) => ({
+                            userId: req.user.id,
+                            name: interest.name,
+                            category: interest.category
+                        }))
+                    });
+                }
+            }
+            return updatedUser;
         });
         res.json({
             message: 'Profile updated successfully',
-            user: updatedUser
+            user: result
         });
     }
     catch (error) {
@@ -165,14 +265,75 @@ router.put('/profile', authMiddleware_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to update profile' });
     }
 });
-// Upload avatar   -- Verify Later 
+// Add skill to user profile
+// @ts-ignore
+router.post('/skills', authMiddleware_1.authenticateToken, async (req, res) => {
+    try {
+        const { name, level, category } = req.body;
+        if (!name || !level || !category) {
+            return res.status(400).json({ error: 'Name, level, and category are required' });
+        }
+        const skill = await db.userSkill.create({
+            data: {
+                userId: req.user?.id,
+                name,
+                level: level.toUpperCase(),
+                category
+            }
+        });
+        res.json({ message: 'Skill added successfully', skill });
+    }
+    catch (error) {
+        console.error('Add skill error:', error);
+        res.status(500).json({ error: 'Failed to add skill' });
+    }
+});
+// Remove skill from user profile
+router.delete('/skills/:skillId', authMiddleware_1.authenticateToken, async (req, res) => {
+    try {
+        const { skillId } = req.params;
+        await db.userSkill.delete({
+            where: {
+                id: skillId,
+                userId: req.user?.id // Ensure user can only delete their own skills
+            }
+        });
+        res.json({ message: 'Skill removed successfully' });
+    }
+    catch (error) {
+        console.error('Remove skill error:', error);
+        res.status(500).json({ error: 'Failed to remove skill' });
+    }
+});
+// Add interest to user profile
+// @ts-ignore
+router.post('/interests', authMiddleware_1.authenticateToken, async (req, res) => {
+    try {
+        const { name, category } = req.body;
+        if (!name || !category) {
+            return res.status(400).json({ error: 'Name and category are required' });
+        }
+        const interest = await db.userInterest.create({
+            data: {
+                userId: req.user?.id,
+                name,
+                category
+            }
+        });
+        res.json({ message: 'Interest added successfully', interest });
+    }
+    catch (error) {
+        console.error('Add interest error:', error);
+        res.status(500).json({ error: 'Failed to add interest' });
+    }
+});
+// Keep your existing routes (avatar upload, get user by ID, etc.)
+// @ts-ignore
 router.post('/avatar', authMiddleware_1.authenticateToken, uploadMiddleware_1.upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
-            res.status(400).json({ error: 'No file uploaded' });
-            return;
+            return res.status(400).json({ error: 'No file uploaded' });
         }
-        // Fix: Use req.user.id (not req.user.userId)
         const userId = req.user.id;
         const avatarPath = `/uploads/${req.file.filename}`;
         // Get user's current avatar to delete old file
@@ -213,32 +374,19 @@ router.post('/avatar', authMiddleware_1.authenticateToken, uploadMiddleware_1.up
                 fs_1.default.unlinkSync(filePath);
             }
         }
-        if (error instanceof Error && error.message.includes('Only image files')) {
-            res.status(400).json({ error: error.message });
-            return;
-        }
         res.status(500).json({ error: 'Failed to upload avatar' });
     }
 });
-// Get user by ID or username (public profile)
+// @ts-ignore
 router.get('/:identifier', async (req, res) => {
     try {
         const { identifier } = req.params;
-        // Check if identifier is a cuid (starts with 'c') or username
         const isId = identifier.startsWith('c');
         const user = await db.user.findUnique({
             where: isId ? { id: identifier } : { username: identifier },
-            select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                bio: true,
-                avatar: true,
-                location: true,
-                totalRatings: true,
-                isVerified: true,
-                createdAt: true,
+            include: {
+                skills: true,
+                interests: true,
                 reviewsReceived: {
                     select: {
                         id: true,
@@ -262,8 +410,7 @@ router.get('/:identifier', async (req, res) => {
             }
         });
         if (!user) {
-            res.status(404).json({ error: 'User not found' });
-            return;
+            return res.status(404).json({ error: 'User not found' });
         }
         res.json(user);
     }
