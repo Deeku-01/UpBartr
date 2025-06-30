@@ -10,6 +10,7 @@ import { Checkbox } from "./ui/checkbox"
 import { Eye, EyeOff, Mail, User, MapPin, Lock } from "lucide-react"
 import axios from "axios"
 import { setAuthToken } from "./utils/setAuthToken"
+import { useLocation } from "react-router-dom"
 
 interface SignupModalProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ interface ResponseData{
 }
 
 export default function SignupModal({ isOpen, onClose, onSwitchToSignin }: SignupModalProps) {
+  const location=useLocation();
   const [step, setStep] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -86,6 +88,8 @@ export default function SignupModal({ isOpen, onClose, onSwitchToSignin }: Signu
       })
 
     setAuthToken(data.token,data.user.id)
+
+    window.location.href = "/dashboard"
   
     // Close modal after successful signup
     onClose()
