@@ -13,144 +13,45 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import SkeletonCard from '../lib/skeleton';
+import { api } from '../utils/setAuthToken';
 
-const initialSkillRequests = [
-  {
-    id: 1,
-    title: 'Need React Developer for Portfolio Website',
-    category: 'Technology',
-    author: 'Marcus Johnson',
-    avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 4.8,
-    location: 'Austin, TX',
-    skillNeeded: 'React Development',
-    skillOffered: 'Professional Photography',
-    duration: '2 weeks',
-    applications: 12,
-    views: 89,
-    isRemote: true,
-    tags: ['react', 'typescript', 'frontend'],
-    description: 'Looking for an experienced React developer to help me build a modern portfolio website. I have the designs ready and need someone to bring them to life with clean, responsive code.',
-    postedAt: '2024-01-20',
-    deadline: '2024-02-15',
-    isBookmarked: false,
-    isLiked: true
-  },
-  {
-    id: 2,
-    title: 'Learn Digital Marketing Strategies',
-    category: 'Business',
-    author: 'Sarah Chen',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 4.9,
-    location: 'San Francisco, CA',
-    skillNeeded: 'Digital Marketing',
-    skillOffered: 'Full Stack Development',
-    duration: '1 month',
-    applications: 8,
-    views: 156,
-    isRemote: true,
-    tags: ['marketing', 'seo', 'strategy'],
-    description: 'I want to learn modern digital marketing techniques including SEO, social media marketing, and content strategy. Looking for hands-on guidance and practical tips.',
-    postedAt: '2024-01-18',
-    deadline: '2024-03-01',
-    isBookmarked: true,
-    isLiked: false
-  },
-  {
-    id: 3,
-    title: 'Spanish Conversation Practice Partner',
-    category: 'Language',
-    author: 'David Park',
-    avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 4.7,
-    location: 'Seattle, WA',
-    skillNeeded: 'Spanish Tutoring',
-    skillOffered: 'Guitar Lessons',
-    duration: '3 months',
-    applications: 15,
-    views: 203,
-    isRemote: true,
-    tags: ['spanish', 'language', 'conversation'],
-    description: 'Seeking a native Spanish speaker for regular conversation practice. I\'m intermediate level and want to improve my fluency and confidence in speaking.',
-    postedAt: '2024-01-15',
-    deadline: '2024-04-15',
-    isBookmarked: false,
-    isLiked: false
-  },
-  {
-    id: 4,
-    title: 'Brand Identity Design for Startup',
-    category: 'Creative',
-    author: 'Elena Rodriguez',
-    avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 5.0,
-    location: 'Miami, FL',
-    skillNeeded: 'Graphic Design',
-    skillOffered: 'Business Strategy',
-    duration: '3 weeks',
-    applications: 6,
-    views: 78,
-    isRemote: true,
-    tags: ['branding', 'design', 'startup'],
-    description: 'Need a talented graphic designer to create a complete brand identity for my tech startup. This includes logo, color palette, typography, and brand guidelines.',
-    postedAt: '2024-01-22',
-    deadline: '2024-02-20',
-    isBookmarked: true,
-    isLiked: true
-  },
-  {
-    id: 5,
-    title: 'Personal Fitness Training Program',
-    category: 'Health',
-    author: 'Maya Thompson',
-    avatar: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 4.9,
-    location: 'Denver, CO',
-    skillNeeded: 'Personal Training',
-    skillOffered: 'Photography Lessons',
-    duration: '2 months',
-    applications: 9,
-    views: 134,
-    isRemote: false,
-    tags: ['fitness', 'health', 'training'],
-    description: 'Looking for a certified personal trainer to help me create a custom workout routine and provide ongoing coaching. Want to focus on strength training and overall fitness.',
-    postedAt: '2024-01-19',
-    deadline: '2024-03-19',
-    isBookmarked: false,
-    isLiked: false
-  },
-  {
-    id: 6,
-    title: 'Learn Music Production Basics',
-    category: 'Music',
-    author: 'Alex Kumar',
-    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-    rating: 4.8,
-    location: 'Nashville, TN',
-    skillNeeded: 'Music Production',
-    skillOffered: 'Italian Cooking',
-    duration: '6 weeks',
-    applications: 11,
-    views: 167,
-    isRemote: true,
-    tags: ['music', 'production', 'audio'],
-    description: 'Interested in learning music production and audio engineering. Want to understand DAWs, mixing, and mastering techniques for electronic music.',
-    postedAt: '2024-01-17',
-    deadline: '2024-03-10',
-    isBookmarked: false,
-    isLiked: true
-  }
-];
+// Define the SkillRequest interface
+interface SkillRequest {
+  id: number;
+  title: string;
+  category: string;
+  author: string;
+  avatar: string;
+  rating: number;
+  location: string;
+  skillNeeded: string;
+  skillOffered: string;
+  duration: string;
+  applications: number;
+  views: number;
+  isRemote: boolean;
+  tags: string[];
+  description: string;
+  postedAt: string;
+  deadline: string;
+  isBookmarked: boolean;
+  isLiked: boolean;
+}
+
+interface Category {
+  name: string;
+  icon: string;
+  count: number; // This will be calculated dynamically
+}
 
 const initialCategories = [
-  { name: 'All', icon: '🌟', count: 23 },
-  { name: 'Technology', icon: '💻', count: 5},
-  { name: 'Creative', icon: '🎨', count: 7 },
-  { name: 'Business', icon: '💼', count: 4 },
-  { name: 'Language', icon: '🗣️', count: 4 },
-  { name: 'Health', icon: '💪', count: 8 },
-  { name: 'Music', icon: '🎵', count: 1 }
+  { name: 'All', icon: '🌟' },
+  { name: 'Technology', icon: '💻' },
+  { name: 'Creative', icon: '🎨' },
+  { name: 'Business', icon: '💼' },
+  { name: 'Language', icon: '🗣️' },
+  { name: 'Health', icon: '💪' },
+  { name: 'Music', icon: '🎵' }
 ];
 
 export default function BrowseSkills() {
@@ -160,71 +61,65 @@ export default function BrowseSkills() {
   const [sortBy, setSortBy] = useState('newest');
   const [locationFilter, setLocationFilter] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [skillRequests, setSkillRequests] = useState(initialSkillRequests);
-  const [categories, setCategories] = useState(initialCategories);
+  const [loading, setLoading] = useState(true); // Set to true initially
+  const [skillRequests, setSkillRequests] = useState<SkillRequest[]>([]); // Initialize as empty array
+  const [categories, setCategories] = useState<Category[]>(initialCategories.map(cat => ({...cat, count: 0}))); // Initialize with 0 counts
+  const [minRating, setMinRating] = useState<number>(0); // New state for minRating
+  const [error, setError] = useState<string | null>(null); // New state for error messages
   
-    useEffect(() => {
-      const fetchSkillRequests = async () => {
-        setLoading(true);
-  
-        try {
-
-          const userId= localStorage.getItem('userId');
-          const response = await axios.get(`http://localhost:3000/api/skillreqs/requests/user?excludeUser=${userId}`);
-          const fetchedSkills = response.data;
-  
-          // Make sure fetchedSkills is an array
-          if (!Array.isArray(fetchedSkills)) {
-            console.warn('Fetched data is not an array:', fetchedSkills);
-            return;
-          }
-          
-          // Combine initial data with fetched data
-          const allSkills = [...initialSkillRequests, ...fetchedSkills];
-          setSkillRequests(fetchedSkills);
-          
-          // Update categories count based on all skills
-          const updatedCategories = initialCategories.map(category => {
-            if (category.name === 'All') {
-              return { ...category, count: fetchedSkills.length };
+  const fetchSkills = async () => {
+    setLoading(true);
+    setError(null); // Clear previous errors
+    try {
+        const response = await api.get('/api/skillreqs/requests', {
+            params: {
+                search: searchQuery,
+                category: selectedCategory === 'All' ? undefined : selectedCategory,
+                location: locationFilter || undefined,
+                isRemote: remoteOnly || undefined, 
+                minRating: minRating > 0 ? minRating : undefined, 
+                sortBy: sortBy 
             }
-            return {
-              ...category,
-              count: fetchedSkills.filter(skill => skill.category === category.name).length
-            };
-          });
-          
-          setCategories(updatedCategories);
-          
-        } catch (err) {
-          console.error("Error fetching skill requests:", err);
-          console.log("Failed to fetch skill requests");
-        }finally {
-          const promise = await new Promise((resolve) => {
-            setTimeout(() => {
-              resolve(true);
-            }, 1000); // Simulate a 1 second delay
-          });
-          setLoading(false);
+        });
+        setSkillRequests(response.data);
+        
+        // Dynamically calculate category counts
+        const updatedCategories = initialCategories.map(cat => {
+          const count = cat.name === 'All' 
+            ? response.data.length 
+            : response.data.filter((skill: SkillRequest) => skill.category === cat.name).length;
+          return { ...cat, count };
+        });
+        setCategories(updatedCategories);
+
+    } catch (err: any) {
+        console.error('Error fetching skills:', err);
+        if (err.response && err.response.status === 401) {
+            setError('Authentication required. Please log in again.');
+        } else {
+            setError('Failed to load skills. Please try again later.');
         }
-      };
-  
-      fetchSkillRequests();
-    }, []); // Empty dependency array - runs once on mount
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSkills();
+  }, [searchQuery, selectedCategory, locationFilter, remoteOnly, minRating, sortBy]);
 
   const filteredSkills = skillRequests.filter(skill => {
     const matchesCategory = selectedCategory === 'All' || skill.category === selectedCategory;
     const matchesSearch = skill.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          skill.skillNeeded.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         skill.skillOffered.toLowerCase().includes(searchQuery.toLowerCase());
+                         skill.skillOffered.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         skill.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesLocation = !locationFilter || skill.location.toLowerCase().includes(locationFilter.toLowerCase());
     const matchesRemote = !remoteOnly || skill.isRemote;
+    const matchesRating = skill.rating >= minRating;
     
-    return matchesCategory && matchesSearch && matchesLocation && matchesRemote;
+    return matchesCategory && matchesSearch && matchesLocation && matchesRemote && matchesRating;
   });
-
-  
 
   const sortedSkills = [...filteredSkills].sort((a, b) => {
     switch (sortBy) {
@@ -317,6 +212,19 @@ export default function BrowseSkills() {
                   <span className="ml-2 text-sm text-gray-700">Remote only</span>
                 </label>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Rating</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={minRating}
+                  onChange={(e) => setMinRating(parseFloat(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Results</label>
@@ -357,8 +265,16 @@ export default function BrowseSkills() {
         </div>
       )}
 
+      {/* Error Message */}
+      {error && !loading && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
+
       {/* Results */}
-      {!loading &&(
+      {!loading && !error && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {sortedSkills.map((skill) => (
           <div key={skill.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-300 group">
@@ -457,7 +373,7 @@ export default function BrowseSkills() {
       )}
 
       {/* No Results */}
-      {sortedSkills.length === 0 && (
+      {!loading && sortedSkills.length === 0 && !error && (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Search className="w-12 h-12 text-gray-400" />
@@ -472,6 +388,8 @@ export default function BrowseSkills() {
               setSelectedCategory('All');
               setLocationFilter('');
               setRemoteOnly(false);
+              setMinRating(0); 
+              setSortBy('newest'); 
             }}
             className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300"
           >
@@ -481,7 +399,7 @@ export default function BrowseSkills() {
       )}
 
       {/* Load More */}
-      {sortedSkills.length > 0 && !loading && (
+      {sortedSkills.length > 0 && !loading && !error && (
         <div className="text-center">
           <button className="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-lg font-semibold hover:bg-emerald-600 hover:text-white transition-all duration-300">
             Load More Results

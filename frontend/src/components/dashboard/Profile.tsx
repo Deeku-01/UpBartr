@@ -1,513 +1,266 @@
+// src/components/dashboard/Profile.tsx
+
 import { useEffect, useState } from 'react';
-import { 
-  Camera, 
-  Edit, 
-  Star, 
-  MapPin, 
-  Calendar, 
-  Award, 
+import {
+  Camera,
+  Edit,
+  Star,
+  MapPin,
+  Calendar,
+  Award,
   CheckCircle,
   Plus,
   X,
-  Save
+  Save,
+  MessageCircle
 } from 'lucide-react';
 import axios from 'axios';
+import { useParams, useNavigate } from 'react-router-dom';
 
-const userProfile = {
-  id: 1,
-  firstName: 'Sarah',
-  lastName: 'Chen',
-  username: 'sarahchen',
-  email: 'sarah.chen@example.com',
-  avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&fit=crop',
-  bio: 'Full-stack developer with 5+ years of experience in React, Node.js, and TypeScript. Passionate about clean code and user experience. Love sharing knowledge and learning new skills through collaboration.',
-  location: 'San Francisco, CA',
-  rating: 4.9,
-  totalRatings: 23,
-  completedTrades: 23,
-  isVerified: true,
-  joinedAt: '2023-06-15',
-  // skills: [],
-  // interests: [],
-  // achievements: [
-  //   { name: 'Top Trader', description: 'Completed 20+ successful skill exchanges', icon: Award },
-  //   { name: 'Verified Expert', description: 'Skills verified by the community', icon: CheckCircle },
-  //   { name: 'Mentor', description: 'Helped 50+ people learn new skills', icon: Star }
-  // ]
-  skills: [
-    { name: 'React Development', level: 'Expert', category: 'Technology' },
-    { name: 'Node.js', level: 'Expert', category: 'Technology' },
-    { name: 'TypeScript', level: 'Advanced', category: 'Technology' },
-    { name: 'UI/UX Design', level: 'Intermediate', category: 'Creative' },
-    { name: 'Project Management', level: 'Advanced', category: 'Business' }
-  ],
-  interests: [
-    { name: 'Photography', category: 'Creative' },
-    { name: 'Spanish Language', category: 'Language' },
-    { name: 'Digital Marketing', category: 'Business' },
-    { name: 'Fitness Training', category: 'Health' }
-  ],
-  achievements: [
-    { name: 'Top Trader', description: 'Completed 20+ successful skill exchanges', icon: Award },
-    { name: 'Verified Expert', description: 'Skills verified by the community', icon: CheckCircle },
-    { name: 'Mentor', description: 'Helped 50+ people learn new skills', icon: Star }
-  ]
-};
+interface UserProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  username?: string;
+  email: string;
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  rating: number;
+  totalRatings: number;
+  completedTrades: number;
+  isVerified: boolean;
+  joinedAt: string;
+}
 
-const recentReviews = [
-  {
-    id: 1,
-    reviewer: {
-      name: 'Marcus Johnson',
-      avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    rating: 5,
-    comment: 'Sarah is an excellent teacher! Her React expertise helped me build my portfolio website perfectly.',
-    skillExchanged: 'React Development',
-    date: '2024-01-20'
-  },
-  {
-    id: 2,
-    reviewer: {
-      name: 'Elena Rodriguez',
-      avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    rating: 5,
-    comment: 'Amazing collaboration! Sarah\'s technical skills and communication made the project smooth.',
-    skillExchanged: 'Full Stack Development',
-    date: '2024-01-15'
-  },
-  {
-    id: 3,
-    reviewer: {
-      name: 'David Park',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    rating: 4,
-    comment: 'Great experience learning TypeScript. Sarah explains complex concepts in simple terms.',
-    skillExchanged: 'TypeScript',
-    date: '2024-01-10'
-  }
-];
+const API_BASE_URL = import.meta.env.VITE_REACT_APP_BACKEND_URL || 'http://localhost:3000';
 
 export default function Profile() {
-  const [curuser, setUser] = useState(userProfile);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedProfile, setEditedProfile] = useState(userProfile);
-  const [newSkill, setNewSkill] = useState({ name: '', level: 'Beginner', category: 'Technology' });
-  const [showAddSkill, setShowAddSkill] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { identifier } = useParams<{ identifier?: string }>();
+  const navigate = useNavigate();
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('authToken'); // Adjust based on how you store the token
-      
-      const response = await axios.get('http://localhost:3000/api/users/profile',{
-        headers: { 
-          'Authorization': `${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response) {
-        throw new Error('Failed to fetch user profile');
-      }
-      
-      const data = await response.data;
-      
-      // Transform the data to ensure all required fields exist
-      const transformedData = {
-        ...data,
-        joinedAt: data.joinedAt || data.createdAt,
-        skills: data.skills || [],
-        interests: data.interests || [],
-        achievements: data.achievements || []
-      };
-      
-      setUser(transformedData);
-      setEditedProfile(transformedData);
-    } catch (error) { 
-      console.error('Error fetching user profile:', error);
-      // Keep the default profile data if fetch fails
-    } finally {
-      setLoading(false);
-    }
-  };  
+  const currentUserId = localStorage.getItem('userId');
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
+    const fetchUserProfile = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const targetIdentifier = identifier || currentUserId;
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const token = localStorage.getItem('authToken');
-      
-      const response = await fetch('/api/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          firstName: editedProfile.firstName,
-          lastName: editedProfile.lastName,
-          bio: editedProfile.bio,
-          location: editedProfile.location,
-          skills: editedProfile.skills,
-          interests: editedProfile.interests
-        })
-      });
+        if (!targetIdentifier) {
+          setError("User ID not found. Please log in or provide a valid profile identifier.");
+          setIsLoading(false);
+          return;
+        }
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const response = await axios.get<UserProfile>(
+          `${API_BASE_URL}/api/users/${targetIdentifier}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('authToken')}`
+            }
+          }
+        );
+        setProfileData(response.data);
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+        setError('Failed to load user profile. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const data = await response.json();
-      
-      // Update the current user state with the response
-      setUser(prev => ({
-        ...prev,
-        ...data.user,
-        skills: editedProfile.skills,
-        interests: editedProfile.interests
-      }));
-      
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
-    } finally {
-      setSaving(false);
+    fetchUserProfile();
+  }, [identifier, currentUserId]);
+
+  const handleMessageUser = async () => {
+    if (!profileData || !currentUserId) {
+      console.error("Cannot message user: Profile data or current user ID missing.");
+      return;
+    }
+
+    if (profileData.id === currentUserId) {
+      console.warn("Attempted to message self, redirecting to own messages.");
+      navigate('/dashboard/messages');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/conversations/new/${profileData.id}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`
+          }
+        }
+      );
+
+      const { conversationId } = response.data;
+
+      if (conversationId) {
+        navigate(`/dashboard/messages/${conversationId}/${profileData.id}`);
+      } else {
+        console.error("Failed to get conversation ID from backend.");
+        alert("Could not start conversation. Please try again.");
+      }
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+      alert('Failed to start conversation. Please ensure the user exists and you are logged in.');
     }
   };
 
-  const handleAddSkill = () => {
-    if (newSkill.name.trim()) {
-      setEditedProfile({
-        ...editedProfile,
-        skills: [...editedProfile.skills, newSkill]
-      });
-      setNewSkill({ name: '', level: 'Beginner', category: 'Technology' });
-      setShowAddSkill(false);
-    }
-  };
-
-  const removeSkill = (index:number) => {
-    setEditedProfile({
-      ...editedProfile,
-      skills: editedProfile.skills.filter((_, i) => i !== index)
-    });
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-500"></div>
+      <div className="flex justify-center items-center h-full">
+        <p>Loading profile...</p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-          <p className="text-gray-600 mt-1">Manage your profile and showcase your skills</p>
-        </div>
-        <button
-          onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-          disabled={saving}
-          className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 flex items-center disabled:opacity-50"
-        >
-          {saving ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-          ) : isEditing ? (
-            <Save className="w-5 h-5 mr-2" />
-          ) : (
-            <Edit className="w-5 h-5 mr-2" />
-          )}
-          {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Edit Profile'}
-        </button>
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-full text-red-600">
+        <p>{error}</p>
       </div>
+    );
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Profile Card */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Basic Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-start space-x-6">
-              <div className="relative">
-                <img
-                  src={editedProfile.avatar}
-                  alt={`${editedProfile.firstName} ${editedProfile.lastName}`}
-                  className="w-24 h-24 rounded-full object-cover ring-4 ring-emerald-100"
-                />
-                {isEditing && (
-                  <button className="absolute bottom-0 right-0 bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition-colors">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  {isEditing ? (
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={editedProfile.firstName}
-                        onChange={(e) => setEditedProfile({...editedProfile, firstName: e.target.value})}
-                        className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                      <input
-                        type="text"
-                        value={editedProfile.lastName}
-                        onChange={(e) => setEditedProfile({...editedProfile, lastName: e.target.value})}
-                        className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {editedProfile.firstName} {editedProfile.lastName}
-                    </h2>
-                  )}
-                  {editedProfile.isVerified && (
-                    <CheckCircle className="w-6 h-6 text-emerald-500" />
-                  )}
-                </div>
-                
-                <p className="text-gray-600 mb-2">@{editedProfile.username}</p>
-                
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
-                  <div className="flex items-center">
-                    <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
-                    {editedProfile.rating} ({editedProfile.totalRatings} reviews)
-                  </div>
-                  <div className="flex items-center">
-                    <Award className="w-4 h-4 text-purple-500 mr-1" />
-                    {editedProfile.completedTrades} trades completed
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 text-gray-400 mr-1" />
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedProfile.location}
-                        onChange={(e) => setEditedProfile({...editedProfile, location: e.target.value})}
-                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                    ) : (
-                      editedProfile.location
-                    )}
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  {isEditing ? (
-                    <textarea
-                      value={editedProfile.bio}
-                      onChange={(e) => setEditedProfile({...editedProfile, bio: e.target.value})}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  ) : (
-                    <p className="text-gray-700 leading-relaxed">{editedProfile.bio}</p>
-                  )}
-                </div>
-                
-                <div className="flex items-center text-sm text-gray-500">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  Joined {new Date(editedProfile.joinedAt).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long' 
-                  })}
-                </div>
-              </div>
-            </div>
+  if (!profileData) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <p>No profile data available.</p>
+      </div>
+    );
+  }
+
+  const isOwnProfile = profileData.id === currentUserId;
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-6 sm:space-y-0 sm:space-x-8 mb-8">
+          <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-emerald-400 shadow-md flex-shrink-0">
+            <img
+              src={profileData.avatar || 'https://via.placeholder.com/128/ccc/white?text=No+Avatar'}
+              alt={`${profileData.firstName} ${profileData.lastName}`}
+              className="w-full h-full object-cover"
+            />
+            {isOwnProfile && (
+              <button className="absolute bottom-0 right-0 bg-emerald-500 p-2 rounded-full text-white hover:bg-emerald-600 transition-colors">
+                <Camera className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
-          {/* Skills */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Skills I Offer</h3>
-              {isEditing && (
+          <div className="text-center sm:text-left flex-grow">
+            <div className="flex items-center justify-center sm:justify-start space-x-2 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">
+                {profileData.firstName} {profileData.lastName}
+              </h1>
+              {profileData.isVerified && (
+                <CheckCircle className="w-6 h-6 text-emerald-500" /* REMOVED: title="Verified User" */ />
+              )}
+            </div>
+            {profileData.username && (
+              <p className="text-gray-500 text-lg mb-2">@{profileData.username}</p>
+            )}
+            <div className="flex items-center justify-center sm:justify-start text-gray-600 mb-3">
+              <Star className="w-5 h-5 text-yellow-400 mr-1" fill="currentColor" />
+              <span className="font-semibold">{profileData.rating.toFixed(1)}</span>
+              <span className="ml-1 text-sm">({profileData.totalRatings} ratings)</span>
+              {profileData.location && (
+                <>
+                  <MapPin className="w-5 h-5 ml-4 mr-1" />
+                  <span>{profileData.location}</span>
+                </>
+              )}
+            </div>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              {profileData.bio || 'No bio provided yet.'}
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+              {isOwnProfile ? (
+                <>
+                  <button className="flex items-center px-5 py-2 bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-lg font-medium hover:from-emerald-600 hover:to-blue-700 transition-all duration-300">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={() => setShowAddSkill(true)}
-                  className="text-emerald-600 hover:text-emerald-700 flex items-center text-sm font-medium"
+                  onClick={handleMessageUser}
+                  className="flex items-center px-5 py-2 bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-lg font-medium hover:from-emerald-600 hover:to-blue-700 transition-all duration-300"
                 >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Skill
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Message {profileData.firstName}
                 </button>
               )}
             </div>
-            
-            {showAddSkill && (
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    placeholder="Skill name"
-                    value={newSkill.name}
-                    onChange={(e) => setNewSkill({...newSkill, name: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                  <select
-                    value={newSkill.level}
-                    onChange={(e) => setNewSkill({...newSkill, level: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value="Beginner">Beginner</option>
-                    <option value="Intermediate">Intermediate</option>
-                    <option value="Advanced">Advanced</option>
-                    <option value="Expert">Expert</option>
-                  </select>
-                  <select
-                    value={newSkill.category}
-                    onChange={(e) => setNewSkill({...newSkill, category: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value="Technology">Technology</option>
-                    <option value="Creative">Creative</option>
-                    <option value="Business">Business</option>
-                    <option value="Language">Language</option>
-                    <option value="Health">Health</option>
-                    <option value="Music">Music</option>
-                  </select>
-                </div>
-                <div className="flex space-x-2 mt-3">
-                  <button
-                    onClick={handleAddSkill}
-                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-sm"
-                  >
-                    Add Skill
-                  </button>
-                  <button
-                    onClick={() => setShowAddSkill(false)}
-                    className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {editedProfile.skills?.map((skill, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{skill.name}</h4>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-sm text-gray-600">{skill.level}</span>
-                      <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                        {skill.category}
-                      </span>
-                    </div>
-                  </div>
-                  {isEditing && (
-                    <button
-                      onClick={() => removeSkill(index)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Reviews */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Views</h3>
-            <div className="space-y-4">
-              {recentReviews.map((review) => (
-                <div key={review.id} className="border-b border-gray-100 pb-4 last:border-b-0">
-                  <div className="flex items-start space-x-3">
-                    <img
-                      src={review.reviewer.avatar}
-                      alt={review.reviewer.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">{review.reviewer.name}</h4>
-                        <div className="flex items-center">
-                          {[...Array(review.rating)].map((_, i) => (
-                            <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">"{review.comment}"</p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Skill: {review.skillExchanged}</span>
-                        <span>{new Date(review.date).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Achievements */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Achievements</h3>
-            <div className="space-y-4">
-              {editedProfile.achievements.map((achievement, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <achievement.icon className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900">{achievement.name}</h4>
-                    <p className="text-sm text-gray-600">{achievement.description}</p>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Professional Stats</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Completed Trades</span>
+                  <span className="font-semibold text-gray-900 flex items-center">
+                    <Award className="w-5 h-5 text-yellow-500 mr-2" />
+                    {profileData.completedTrades}
+                  </span>
                 </div>
-              ))}
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Member Since</span>
+                  <span className="font-semibold text-gray-900 flex items-center">
+                    <Calendar className="w-5 h-5 text-purple-500 mr-2" />
+                    {new Date(profileData.joinedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Profile Views</span>
+                  <span className="font-semibold text-gray-900">1,234</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Response Rate</span>
+                  <span className="font-semibold text-gray-900">98%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Avg Response Time</span>
+                  <span className="font-semibold text-gray-900">2 hours</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Success Rate</span>
+                  <span className="font-semibold text-gray-900">95%</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Skills I Want to Learn
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Skills I Want to Learn</h3>
-            <div className="space-y-2">
-              {editedProfile.interests.map((interest, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <span className="font-medium text-gray-900">{interest.name}</span>
-                  <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
-                    {interest.category}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div> */}
-
-          {/* Quick Stats */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Profile Views</span>
-                <span className="font-semibold text-gray-900">1,234</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Response Rate</span>
-                <span className="font-semibold text-gray-900">98%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Avg Response Time</span>
-                <span className="font-semibold text-gray-900">2 hours</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Success Rate</span>
-                <span className="font-semibold text-gray-900">95%</span>
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">React.js</span>
+                <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">Node.js</span>
+                <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">TypeScript</span>
+                <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">UI/UX Design</span>
               </div>
             </div>
           </div>

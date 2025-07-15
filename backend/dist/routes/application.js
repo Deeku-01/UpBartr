@@ -275,6 +275,61 @@ router.get('/received', authMiddleware_1.authenticateToken, async (req, res) => 
         res.status(500).json({ error: 'Failed to fetch received applications' });
     }
 });
+// Get application statistics for dashboard
+// @ts-ignore
+router.get('/stats', authMiddleware_1.authenticateToken, async (req, res) => {
+    try {
+        // ...
+        const [totalApplicationsSubmitted, pendingApplications, acceptedApplications, completedApplications, applicationsReceived, pendingReceivedApplications] = await Promise.all([
+            // Applications submitted by user
+            db.application.count({
+                where: { applicantId: req.user.id }
+            }),
+            db.application.count({
+                where: { applicantId: req.user.id, status: 'PENDING' }
+            }),
+            db.application.count({
+                where: { applicantId: req.user.id, status: 'ACCEPTED' }
+            }),
+            db.application.count({
+                where: { applicantId: req.user.id, status: 'COMPLETED' }
+            }),
+            // Applications received for user's skill requests
+            db.application.count({
+                where: {
+                    skillRequest: {
+                        authorId: req.user.id
+                    }
+                }
+            }),
+            db.application.count({
+                where: {
+                    skillRequest: {
+                        authorId: req.user.id
+                    },
+                    status: 'PENDING'
+                }
+            })
+        ]);
+        const stats = {
+            submitted: {
+                total: totalApplicationsSubmitted,
+                pending: pendingApplications,
+                accepted: acceptedApplications,
+                completed: completedApplications // This can serve as "Completed Trades" if an accepted and completed application means a trade
+            },
+            received: {
+                total: applicationsReceived,
+                pending: pendingReceivedApplications
+            }
+        };
+        res.json(stats);
+    }
+    catch (error) {
+        console.error('Get application stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch application statistics' });
+    }
+});
 // Get specific application details
 // @ts-ignore
 router.get('/:applicationId', authMiddleware_1.authenticateToken, async (req, res) => {
@@ -638,59 +693,6 @@ router.put('/:applicationId/complete', authMiddleware_1.authenticateToken, async
     catch (error) {
         console.error('Complete application error:', error);
         res.status(500).json({ error: 'Failed to complete application' });
-    }
-});
-// Get application statistics for dashboard
-router.get('/stats/dashboard', authMiddleware_1.authenticateToken, async (req, res) => {
-    try {
-        const [totalApplicationsSubmitted, pendingApplications, acceptedApplications, completedApplications, applicationsReceived, pendingReceivedApplications] = await Promise.all([
-            // Applications submitted by user
-            db.application.count({
-                where: { applicantId: req.user.id }
-            }),
-            db.application.count({
-                where: { applicantId: req.user.id, status: 'PENDING' }
-            }),
-            db.application.count({
-                where: { applicantId: req.user.id, status: 'ACCEPTED' }
-            }),
-            db.application.count({
-                where: { applicantId: req.user.id, status: 'COMPLETED' }
-            }),
-            // Applications received for user's skill requests
-            db.application.count({
-                where: {
-                    skillRequest: {
-                        authorId: req.user.id
-                    }
-                }
-            }),
-            db.application.count({
-                where: {
-                    skillRequest: {
-                        authorId: req.user.id
-                    },
-                    status: 'PENDING'
-                }
-            })
-        ]);
-        const stats = {
-            submitted: {
-                total: totalApplicationsSubmitted,
-                pending: pendingApplications,
-                accepted: acceptedApplications,
-                completed: completedApplications
-            },
-            received: {
-                total: applicationsReceived,
-                pending: pendingReceivedApplications
-            }
-        };
-        res.json(stats);
-    }
-    catch (error) {
-        console.error('Get application stats error:', error);
-        res.status(500).json({ error: 'Failed to fetch application statistics' });
     }
 });
 exports.default = router;

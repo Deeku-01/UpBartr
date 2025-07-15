@@ -1,4 +1,5 @@
 "use strict";
+// app.ts (your main Express app file)
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -9,28 +10,22 @@ const cors_1 = __importDefault(require("cors"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const user_1 = __importDefault(require("./routes/user"));
 const application_1 = __importDefault(require("./routes/application"));
-const exchange_1 = __importDefault(require("./routes/exchange"));
 const skillrequests_1 = __importDefault(require("./routes/skillrequests"));
-// // Import middleware
-// import { errorHandler } from './middleware/error.middleware';
+const conversations_1 = __importDefault(require("./routes/conversations")); // NEW: Import conversation routes
+// Import middleware
+const authMiddleware_1 = require("./middleware/authMiddleware");
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-// Security middleware
-// app.use(cors({
-//   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-//   credentials: true
-// }));
 app.use((0, cors_1.default)());
 // Routes
 app.use('/api/skillreqs', skillrequests_1.default);
 app.use('/api/auth', auth_1.default);
 app.use('/api/users', user_1.default);
-app.use('/api/skills', application_1.default);
-app.use('/api/exchanges', exchange_1.default);
-// // Error handling
-// app.use(errorHandler);
+app.use('/api/skills', application_1.default); // Applications routes
+app.use('/api/conversations', authMiddleware_1.authenticateToken, conversations_1.default); // NEW: Register conversation routes
+// Note: `authenticateToken` is applied here so all conversation routes are protected.
 // 404 handler
-app.use('/', (req, res) => {
+app.get('/', (req, res) => {
     res.status(200).json({ message: 'Welcome !!' });
 });
 exports.default = app;

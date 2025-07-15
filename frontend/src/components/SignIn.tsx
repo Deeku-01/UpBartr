@@ -10,7 +10,7 @@ import { Label } from "./ui/label"
 import { Checkbox } from "./ui/checkbox"
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
 import axios from "axios"
-import { setAuthToken } from "./utils/setAuthToken"
+import { setAuthToken, api } from "./utils/setAuthToken"
 import { useNavigate } from "react-router-dom"
 
 interface SigninModalProps {

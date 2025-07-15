@@ -11,133 +11,138 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  username    String?   @unique
-  firstName   String
-  lastName    String
-  password    String
-  bio         String?
-  avatar      String?
-  location    String?
-  rating      Float    @default(0)
-  totalRatings Int     @default(0)
-  isVerified  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  // completedTrades Int     @default(0) // Number of completed trades
-  // relationships with trades should be added 
-  
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  username           String?         @unique
+  firstName          String
+  lastName           String
+  password           String
+  bio                String?
+  avatar             String?
+  location           String?
+  rating             Float           @default(0)
+  totalRatings       Int             @default(0)
+  isVerified         Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   // Marketplace relationships
-  skillRequests     SkillRequest[]
-  applications      Application[]
-  skillRequestViews SkillRequestView[]
-  
+  skillRequests      SkillRequest[]
+  applications       Application[]
+  skillRequestViews  SkillRequestView[]
+
   // Review relationships
-  reviewsGiven      Review[] @relation("ReviewGiver")
-  reviewsReceived   Review[] @relation("ReviewReceiver")
+  reviewsGiven       Review[]        @relation("ReviewGiver")
+  reviewsReceived    Review[]        @relation("ReviewReceiver")
 
   // Skills and interests relationships
-  skills            UserSkill[]
-  interests         UserInterest[]
+  skills             UserSkill[]
+  interests          UserInterest[]
+
+  // Messaging relationships
+  sentMessages       Message[]       @relation("SentMessages")
+  receivedMessages   Message[]       @relation("ReceivedMessages")
+  // NEW: Add the inverse relation for ConversationParticipant
+  conversationParticipants ConversationParticipant[] // This is the missing inverse field
 
   @@map("users")
 }
 
 model UserSkill {
-  id          String     @id @default(cuid())
-  userId      String
-  name        String
-  level       SkillLevel
-  category    String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @default(cuid())
+  userId    String
+  name      String
+  level     SkillLevel
+  category  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   // Relations
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@map("user_skills")
 }
 
 model UserInterest {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@map("user_interests")
 }
 
 model SkillRequest {
-  id                  String   @id @default(cuid())
+  id                  String             @id @default(cuid())
   authorId            String
   title               String
   description         String
-  skillNeeded         String   // What skill they need
-  skillOffered        String   // What skill they're offering in return
+  skillNeeded         String             // What skill they need
+  skillOffered        String             // What skill they're offering in return
   category            String
-  estimatedDuration   String?  // e.g., "2 weeks", "1 month"
+  estimatedDuration   String?            // e.g., "2 weeks", "1 month"
   deadline            DateTime?
   location            String?
-  isRemote            Boolean  @default(false)
-  requirements        String[] // Array of requirements
-  deliverables        String[] // What they expect to receive
-  tags                String[] // Tags for better searchability
+  isRemote            Boolean            @default(false)
+  requirements        String[]           // Array of requirements
+  deliverables        String[]           // What they expect to receive
+  tags                String[]           // Tags for better searchability
   status              SkillRequestStatus @default(OPEN)
   acceptedApplicantId String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   // Relations
-  author       User @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  applications Application[]
-  views        SkillRequestView[]
+  author              User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  applications        Application[]
+  views               SkillRequestView[]
+  messages            Message[]          @relation("SkillRequestMessages") // Messages related to this skill request
 
   @@map("skill_requests")
 }
 
 model Application {
-  id               String @id @default(cuid())
+  id               String            @id @default(cuid())
   skillRequestId   String
   applicantId      String
   message          String
   proposedTimeline String?
-  portfolio        String[] // URLs to portfolio items
-  experience       String?  // Relevant experience description
-  whyChooseMe      String?  // Why they should be chosen
+  portfolio        String[]          // URLs to portfolio items
+  experience       String?           // Relevant experience description
+  whyChooseMe      String?           // Why they should be chosen
   status           ApplicationStatus @default(PENDING)
-  responseMessage  String?  // Response from the skill request author
+  responseMessage  String?           // Response from the skill request author
   respondedAt      DateTime?
-  startedAt        DateTime?    // When work actually started
-  completedAt      DateTime?    // When work was completed
-  createdAt        DateTime @default(now())
+  startedAt        DateTime?         // When work actually started
+  completedAt      DateTime?         // When work was completed
+  createdAt        DateTime          @default(now())
 
   // Relations
-  skillRequest SkillRequest @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
-  applicant    User @relation(fields: [applicantId], references: [id], onDelete: Cascade)
-  review       Review?      // Review after completion
+  skillRequest     SkillRequest      @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
+  applicant        User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  review           Review?           // Review after completion
+  messages         Message[]         @relation("ApplicationMessages") // Messages related to this application
 
   @@unique([skillRequestId, applicantId])
   @@map("applications")
 }
 
 model SkillRequestView {
-  id              String @id @default(cuid())
-  userId          String
-  skillRequestId  String
-  viewedAt        DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  skillRequestId String
+  viewedAt       DateTime @default(now())
 
   // Relations
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skillRequest SkillRequest @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillRequest   SkillRequest @relation(fields: [skillRequestId], references: [id], onDelete: Cascade)
 
   @@unique([userId, skillRequestId])
   @@map("skill_request_views")
@@ -158,6 +163,63 @@ model Review {
 
   @@map("reviews")
 }
+
+
+// schema.prisma
+
+// ... existing models (User, UserSkill, UserInterest, SkillRequest, Application, SkillRequestView, Review) ...
+
+model Conversation {
+  id          String                    @id @default(cuid())
+  participants ConversationParticipant[]
+  messages    Message[]
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt // Recommended for tracking updates
+
+  @@map("conversations") // Good practice to map to a plural table name
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  assignedAt     DateTime     @default(now())
+
+  @@unique([userId, conversationId]) // Ensures a user is only listed once per conversation
+  @@map("conversation_participants")
+}
+
+
+model Message {
+  id               String    @id @default(cuid())
+  senderId         String
+  receiverId       String?   // Optional: For clarity in 1-on-1, or could be a list for groups.
+  conversationId   String    // Foreign key to the Conversation model
+  content          String
+  timestamp        DateTime  @default(now())
+  read             Boolean   @default(false)
+  type             MessageType @default(CHAT)
+  skillRequestId   String?
+  applicationId    String?
+
+  sender           User      @relation("SentMessages", fields: [senderId], references: [id])
+  receiver         User?     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  conversation     Conversation @relation(fields: [conversationId], references: [id]) // NEW: Link to Conversation model
+  skillRequest     SkillRequest? @relation("SkillRequestMessages", fields: [skillRequestId], references: [id])
+  application      Application?  @relation("ApplicationMessages", fields: [applicationId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
+}
+
+// ... existing enums (SkillLevel, SkillRequestStatus, ApplicationStatus, MessageType) ...
+
+
+
 
 // Enums
 enum SkillLevel {
@@ -182,4 +244,10 @@ enum ApplicationStatus {
   WITHDRAWN
   IN_PROGRESS
   COMPLETED
+}
+
+// New Enum for Message Type
+enum MessageType {
+  CHAT
+  SYSTEM
 }

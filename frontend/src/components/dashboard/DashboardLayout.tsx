@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 import axios from 'axios';
+import { SocketProvider } from '@/contexts/SocketProvider';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -29,13 +30,14 @@ const navigation = [
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
- const currentUser = {
+export const currentUser = { // Export it if used directly in Messages.tsx for now
+    id: 'myUserId123', // !!! IMPORTANT: Replace with actual dynamic user ID from your authentication
     name: 'Sarah Chen',
     email: 'sarah.chen@example.com',
     avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
     rating: 4.9,
     completedTrades: 23
-  };
+};
 
   interface CurrentUserInput{
     name:string,
@@ -102,6 +104,7 @@ useEffect(() => {
 
 
   return (
+    <SocketProvider currentUserId={currentUser.id}>
     <div className="min-h-screen bg-gray-50 flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
@@ -217,5 +220,6 @@ useEffect(() => {
         </main>
       </div>
     </div>
+    </SocketProvider>
   );
 }
