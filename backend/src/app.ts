@@ -37,7 +37,7 @@ app.use('/api/exchanges', exchangeRoutes);
 
 // 404 handler
 app.use('/', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  res.status(200).json({ message: 'Welcome !!' });
 });
 
 export default app;
