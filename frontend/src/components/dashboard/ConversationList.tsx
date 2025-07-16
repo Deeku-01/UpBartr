@@ -274,7 +274,7 @@ export default function ConversationList() {
             >
               <div className="flex-shrink-0 relative">
                 <img
-                  src={conv.participant.avatar || 'https://via.placeholder.com/50'}
+                  src={conv.participant.avatar || ''}
                   alt={`${conv.participant.firstName} ${conv.participant.lastName}`}
                   className="w-12 h-12 rounded-full object-cover"
                 />

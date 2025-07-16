@@ -1,6 +1,7 @@
 // src/contexts/SocketProvider.tsx
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { api } from '../components/utils/setAuthToken'; // Import api for fetching messages
 
 interface SocketProviderProps {
   children: React.ReactNode;
@@ -10,19 +11,35 @@ interface SocketProviderProps {
 interface ChatMessage {
   id: string;
   senderId: string; // Now we use ID for consistent identification
-  receiverId: string; // Explicitly for direct messages
+  receiverId: string | null; // Changed to allow null
   content: string;
   timestamp: string;
   isOwn: boolean;
+  type: 'CHAT' | 'SYSTEM';
+  senderName: string; // Populated by backend
+  senderAvatar: string; // Populated by backend
+  conversationId: string; // Ensure this is always present
+}
+
+// Interface for a chat message received via Socket.IO (should match backend emit structure)
+interface RealtimeChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  receiverId: string | null;
+  content: string;
+  timestamp: string;
+  isOwn: boolean; // True if sent by current user, false otherwise
+  type: 'CHAT' | 'SYSTEM';
+  senderName: string;
+  senderAvatar: string;
 }
 
 interface ISocketContext {
-  sendMessage: (recipientId: string, msg: string) => void; // sendMessage now takes recipientId
+  sendMessage: (conversationId: string, recipientId: string, msg: string) => void; // sendMessage now takes conversationId and recipientId
   socket: Socket | null;
   isConnected: boolean;
-  // messages: ChatMessage[]; // Removed: messages will be managed by Messages.tsx based on selected convo
-  // Instead, provide a function to load messages for a specific conversation
-  loadConversationMessages: (user1Id: string, user2Id: string) => Promise<ChatMessage[]>;
+  loadConversationMessages: (conversationId: string, currentUserId: string) => Promise<ChatMessage[]>; // Updated to take currentUserId
 }
 
 export const socketContext = createContext<ISocketContext | null>(null);
@@ -34,82 +51,74 @@ export const useSocket = () => {
 };
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children, currentUserId }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]); // This will hold all received/sent messages
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  // messages state is now handled within Messages.tsx for the selected conversation
+  // Use a ref for the messages cache to avoid re-creating it on every render
+  // and to ensure its value is stable across `useEffect` calls.
+  const messagesCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
-  const sendMessage = useCallback((recipientId: string, msg: string) => {
-    if (socket && isConnected && currentUserId) {
-      const messageData = {
-        senderId: currentUserId,
-        recipientId: recipientId, // The ID of the person we are sending to
-        content: msg,
-        timestamp: new Date().toISOString(), // Use ISO string for consistent time
-      };
-      socket.emit('send_message', messageData);
-      console.log('Emitted send_message:', messageData);
+  // Function to load messages for a specific conversation, with caching
+  const loadConversationMessages = useCallback(async (conversationId: string, userId: string): Promise<ChatMessage[]> => {
+    // Check cache first
+    if (messagesCache.current.has(conversationId)) {
+      console.log(`Loading messages for ${conversationId} from cache.`);
+      return messagesCache.current.get(conversationId)!;
+    }
 
+    console.log(`Fetching messages for ${conversationId} from API.`);
+    try {
+      const response = await api.get<ChatMessage[]>(`/api/messages/${conversationId}`);
+      const fetchedMessages = response.data.map(msg => ({
+        ...msg,
+        isOwn: msg.senderId === userId,
+      }));
+      messagesCache.current.set(conversationId, fetchedMessages); // Store in cache
+      return fetchedMessages;
+    } catch (error) {
+      console.error('Error loading conversation messages:', error);
+      throw error; // Re-throw to be handled by the component
+    }
+  }, []); // No dependencies, as messagesCache.current is stable
+
+  // Function to send a message (now includes conversationId)
+  const sendMessage = useCallback((conversationId: string, recipientId: string, msg: string) => {
+    if (socket && isConnected) {
+      // The backend's /api/conversations/messages route handles the Socket.IO emit
+      // So, we don't emit directly from here for chat messages.
+      // We'll rely on the real-time listener to update the cache and UI.
+      console.log(`Attempting to send message to conversation ${conversationId} for recipient ${recipientId}: ${msg}`);
     } else {
-      console.warn('Socket not connected or currentUserId missing, message not sent:', msg);
+      console.warn('Socket not connected. Message not sent.');
     }
-  }, [socket, isConnected, currentUserId]);
-
-  const loadConversationMessages = useCallback(async (user1Id: string, user2Id: string): Promise<ChatMessage[]> => {
-    if (!socket || !isConnected) {
-        console.warn('Socket not connected. Cannot load conversation history.');
-        return [];
-    }
-    // Emit an event to the server to request message history
-    // The server will then emit back a 'message_history' event
-    // For now, we'll return a promise that resolves when history is received.
-    // In a real app, you might use a more robust promise-based approach
-    // or store this history in a local state and resolve/reject.
-
-    // A more direct way is to fetch history via a REST API if it's large,
-    // or if you always fetch the whole history. If it's for initial load
-    // of a specific chat, Socket.IO can manage it.
-    return new Promise((resolve) => {
-        const historyListener = (messages: any[]) => {
-            console.log('Received message_history:', messages);
-            const formattedMessages = messages.map(msg => ({
-                id: msg._id || msg.id, // Use _id from MongoDB or 'id' if just generated
-                senderId: msg.senderId,
-                receiverId: msg.receiverId,
-                content: msg.content,
-                timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                isOwn: msg.senderId === currentUserId,
-            }));
-            socket.off('message_history', historyListener); // Remove listener after receiving history
-            resolve(formattedMessages);
-        };
-        socket.on('message_history', historyListener);
-        socket.emit('request_message_history', { user1Id, user2Id });
-    });
-  }, [socket, isConnected, currentUserId]);
-
+  }, [socket, isConnected]);
 
   useEffect(() => {
     if (!currentUserId) {
-        console.log("Waiting for current user ID before connecting socket.");
-        return; // Don't connect until we have a user ID
+      console.log('No currentUserId, skipping socket connection.');
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+      setIsConnected(false);
+      return;
     }
 
-    const newSocket = io('http://localhost:3000', {
-      query: { userId: currentUserId }, // Pass current user ID on connection
+    const newSocket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000', {
+      auth: {
+        token: localStorage.getItem('authToken'), // Pass JWT token for authentication
+      },
+      query: { userId: currentUserId } // Pass userId as query parameter
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket connected successfully! User ID:', currentUserId);
+      console.log('Socket connected with ID:', newSocket.id);
       setIsConnected(true);
-      // Join a personal room for direct messaging
-      newSocket.emit('join_personal_room', currentUserId);
     });
 
     newSocket.on('disconnect', () => {
       console.log('Socket disconnected.');
       setIsConnected(false);
-      setMessages([]); // Clear messages on disconnect
+      messagesCache.current.clear(); // Clear cache on disconnect
     });
 
     newSocket.on('connect_error', (error) => {
@@ -118,14 +127,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children, curren
     });
 
     // Listener for individual messages arriving in a room
-    newSocket.on('receive_message', (data: { id: string; content: string; senderId: string; receiverId: string; timestamp: string }) => {
-      console.log('Received direct message:', data);
-      // The `Messages.tsx` component will handle adding this to its local state
-      // if the message belongs to the currently selected conversation.
-      // So, we don't update `messages` state here in SocketProvider anymore.
-      // We could use a global state management library (Redux, Zustand) or a
-      // more complex Context structure if you want all messages available here.
-      // For now, `Messages.tsx` will listen for this specifically.
+    newSocket.on('receive_message', (data: RealtimeChatMessage) => {
+      console.log('Received real-time message in SocketProvider:', data);
+
+      // Update the cache with the new message
+      messagesCache.current.set(
+        data.conversationId,
+        [...(messagesCache.current.get(data.conversationId) || []), { ...data, isOwn: data.senderId === currentUserId }]
+      );
     });
 
 
@@ -135,6 +144,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children, curren
       newSocket.disconnect();
       setSocket(null);
       setIsConnected(false);
+      messagesCache.current.clear(); // Clear cache on unmount
     };
   }, [currentUserId]); // Re-run effect if currentUserId changes
 
@@ -151,8 +161,3 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children, curren
     </socketContext.Provider>
   );
 };
-
-
-
-
-

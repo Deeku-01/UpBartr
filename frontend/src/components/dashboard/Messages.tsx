@@ -9,18 +9,17 @@ import {
   Phone,
   Video,
   Info,
-  MessageCircle, // Added for the "No messages yet" placeholder
+  MessageCircle,
 } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketProvider';
-import { api } from '../utils/setAuthToken'; // Use your configured axios instance
+import { api } from '../utils/setAuthToken';
 
-// Interface for the current authenticated user's profile
 interface CurrentUserProfile {
   id: string;
   firstName: string;
   lastName: string;
   avatar?: string;
-  username?: string; // Assuming username might also be available
+  username?: string;
 }
 
 interface ChatMessage {
@@ -31,12 +30,11 @@ interface ChatMessage {
   timestamp: string;
   isOwn: boolean;
   type: 'CHAT' | 'SYSTEM';
-  senderName: string; // Populated by backend
-  senderAvatar: string; // Populated by backend
-  conversationId: string; // Ensure this is always present
+  senderName: string;
+  senderAvatar: string;
+  conversationId: string;
 }
 
-// Interface for a chat message received via Socket.IO (should match backend emit structure)
 interface RealtimeChatMessage {
   id: string;
   conversationId: string;
@@ -44,38 +42,35 @@ interface RealtimeChatMessage {
   receiverId: string | null;
   content: string;
   timestamp: string;
-  isOwn: boolean; // True if sent by current user, false otherwise
+  isOwn: boolean;
   type: 'CHAT' | 'SYSTEM';
   senderName: string;
   senderAvatar: string;
 }
 
-// Updated interface to match the API response for /api/users/:id
 interface OtherParticipantDetails {
   id: string;
   email: string;
-  avatar?: string; // Made optional as per your response
+  avatar?: string;
   firstName: string;
-  fullName: string; // Added fullName
+  fullName: string;
   rating: number;
   completedTrades: number;
-  username?: string; // Keep username as it might be used for fallback display
+  username?: string;
 }
-
 
 export default function Messages() {
   const { conversationId, otherParticipantId } = useParams<{ conversationId?: string; otherParticipantId?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState('');
-  const [otherParticipant, setOtherParticipant] = useState<OtherParticipantDetails | null>(null); // State to hold other participant's details
-  const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null); // State for current user's profile
+  const [otherParticipant, setOtherParticipant] = useState<OtherParticipantDetails | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { socket, isConnected } = useSocket(); // Get socket and isConnected from context
+  const { socket, isConnected, loadConversationMessages } = useSocket();
 
-  // Scroll to the latest message
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -85,64 +80,58 @@ export default function Messages() {
     const fetchCurrentUserProfile = async () => {
       try {
         const response = await api.get<CurrentUserProfile>('/api/users/profile');
+        console.log('Current user profile data from API:', response.data);
         setCurrentUserProfile(response.data);
       } catch (err) {
         console.error('Error fetching current user profile:', err);
-        // Handle error, e.g., redirect to login or show a message
       }
     };
     fetchCurrentUserProfile();
-  }, []); // Run once on component mount
+  }, []);
 
   // Fetch other participant's details
   useEffect(() => {
     const fetchOtherParticipant = async () => {
       if (otherParticipantId) {
         try {
+          console.log('Fetching other participant with ID:', otherParticipantId);
           const response = await api.get<OtherParticipantDetails>(`/api/users/${otherParticipantId}`);
-          console.log('Fetched other participant details:', response.data); // Debugging log
+          console.log('Fetched other participant details:', response.data);
+          console.log('Other participant avatar URL:', response.data.avatar);
           setOtherParticipant(response.data);
         } catch (err) {
           console.error('Error fetching other participant details:', err);
           setOtherParticipant(null);
         }
       } else {
-        setOtherParticipant(null); // Clear participant if no otherParticipantId
+        console.log('No otherParticipantId provided');
+        setOtherParticipant(null);
       }
     };
     fetchOtherParticipant();
   }, [otherParticipantId]);
 
-
   // Fetch messages for the selected conversation
   useEffect(() => {
-    const fetchMessages = async () => {
-      // Wait for currentUserProfile to be loaded before fetching messages
+    const fetchAndSetMessages = async () => {
       if (!conversationId || !currentUserProfile?.id) {
         setMessages([]);
         setLoading(false);
-        setOtherParticipant(null); // Clear participant if no conversation
+        setOtherParticipant(null);
         return;
       }
 
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get<ChatMessage[]>(`/api/messages/${conversationId}`);
-        // Mark messages as own or not based on senderId
-        const fetchedMessages = response.data.map(msg => ({
-          ...msg,
-          isOwn: msg.senderId === currentUserProfile.id, // Use currentUserProfile.id
-        }));
-        setMessages(fetchedMessages);
-        scrollToBottom(); // Scroll after initial load
+        const fetchedMsgs = await loadConversationMessages(conversationId, currentUserProfile.id);
+        setMessages(fetchedMsgs);
+        scrollToBottom();
 
-        // Join Socket.IO room when conversation is selected
         if (socket && isConnected) {
           socket.emit('join_conversation', conversationId);
           console.log(`Joined Socket.IO room: ${conversationId}`);
         }
-
       } catch (err) {
         console.error('Error fetching messages:', err);
         setError('Failed to load messages. Please try again.');
@@ -152,32 +141,30 @@ export default function Messages() {
       }
     };
 
-    fetchMessages();
+    fetchAndSetMessages();
 
-    // Leave Socket.IO room on component unmount or conversation change
     return () => {
       if (socket && isConnected && conversationId) {
         socket.emit('leave_conversation', conversationId);
         console.log(`Left Socket.IO room: ${conversationId}`);
       }
     };
-  }, [conversationId, currentUserProfile?.id, socket, isConnected]); // Re-fetch messages if conversationId or currentUserProfile changes
+  }, [conversationId, currentUserProfile?.id, socket, isConnected, loadConversationMessages]);
 
   // Listen for real-time messages
   useEffect(() => {
-    if (!socket || !currentUserProfile?.id) return; // Ensure currentUserProfile is loaded
+    if (!socket || !currentUserProfile?.id) return;
 
     const handleReceiveMessage = (data: RealtimeChatMessage) => {
-      // Only add the message if it belongs to the currently active conversation
       if (data.conversationId === conversationId) {
         setMessages((prevMessages) => [
           ...prevMessages,
           {
             ...data,
-            isOwn: data.senderId === currentUserProfile.id, // Use currentUserProfile.id
+            isOwn: data.senderId === currentUserProfile.id,
           },
         ]);
-        scrollToBottom(); // Scroll after new message
+        scrollToBottom();
       }
     };
 
@@ -186,37 +173,33 @@ export default function Messages() {
     return () => {
       socket.off('receive_message', handleReceiveMessage);
     };
-  }, [socket, conversationId, currentUserProfile?.id]); // Re-attach listener if socket, convoId, or currentUserProfile changes
+  }, [socket, conversationId, currentUserProfile?.id]);
 
-  // Scroll to bottom when messages update (debounced or only on new message)
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-
   const handleSendMessage = async () => {
     if (!messageText.trim() || !conversationId || !otherParticipantId || !currentUserProfile?.id) {
-      return; // Ensure current user profile is loaded
+      return;
     }
 
     try {
-      // Send message via API (which then emits via Socket.IO from backend)
       const response = await api.post('/api/conversations/messages', {
         conversationId,
         receiverId: otherParticipantId,
         content: messageText.trim(),
       });
 
-      // Optimistically update UI with the sent message
       setMessages((prevMessages) => [
         ...prevMessages,
         {
-          ...response.data, // Use the data returned from the backend
-          isOwn: true, // It's always our own message if we just sent it
+          ...response.data,
+          isOwn: true,
         },
       ]);
 
-      setMessageText(''); // Clear input after sending
+      setMessageText('');
       scrollToBottom();
     } catch (err) {
       console.error('Error sending message:', err);
@@ -227,18 +210,32 @@ export default function Messages() {
   // Helper to display sender name/avatar for messages
   const getSenderDetails = (message: ChatMessage) => {
     if (message.isOwn) {
-      // Use currentUserProfile for the current user's details
+      const avatarSrc = currentUserProfile?.avatar || 'https://via.placeholder.com/40';
+      console.log('Current user avatar src for sent message:', avatarSrc);
       return {
         name: `${currentUserProfile?.firstName || 'You'} ${currentUserProfile?.lastName || ''}`.trim(),
-        avatar: currentUserProfile?.avatar || 'https://via.placeholder.com/40'
+        avatar: avatarSrc
       };
     }
-    // For messages not from current user, sender details come directly from `message.senderName/senderAvatar`
-    return { name: message.senderName, avatar: message.senderAvatar };
+    
+    // For received messages, try to get avatar from otherParticipant first, then fallback to message data
+    let senderAvatarSrc = message.senderAvatar;
+    
+    // If the sender is the other participant, use their avatar from the profile
+    if (message.senderId === otherParticipantId && otherParticipant?.avatar) {
+      senderAvatarSrc = otherParticipant.avatar;
+    }
+    
+    const finalAvatarSrc = senderAvatarSrc || 'https://via.placeholder.com/40';
+    console.log('Sender avatar src for received message:', finalAvatarSrc);
+    
+    return { 
+      name: message.senderName || otherParticipant?.fullName || 'Unknown User', 
+      avatar: finalAvatarSrc 
+    };
   };
 
-
-  // Show loading state if current user profile is not yet loaded
+  // Show loading state
   if (!currentUserProfile || loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -257,7 +254,7 @@ export default function Messages() {
     );
   }
 
-  // Display this if no conversation is selected (e.g., initial load of /dashboard/messages)
+  // No conversation selected
   if (!conversationId || !otherParticipantId) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-6">
@@ -273,16 +270,27 @@ export default function Messages() {
     );
   }
 
+  // Debug the avatar URL before rendering
+  const otherParticipantAvatarSrc = otherParticipant?.avatar || 'https://via.placeholder.com/50';
+  console.log('Other participant data:', otherParticipant);
+  console.log('Other participant avatar src (header):', otherParticipantAvatarSrc);
+
   return (
-    // This div is the main content area for messages, no sidebar here
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm">
       {/* Chat Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center">
           <img
-            src={otherParticipant?.avatar || 'https://via.placeholder.com/50'}
+            src={otherParticipantAvatarSrc}
             alt={otherParticipant?.fullName || 'User'}
             className="w-10 h-10 rounded-full object-cover mr-3"
+            onError={(e) => {
+              console.error('Avatar image failed to load:', otherParticipantAvatarSrc);
+              e.currentTarget.src = 'https://via.placeholder.com/50';
+            }}
+            onLoad={() => {
+              console.log('Avatar image loaded successfully:', otherParticipantAvatarSrc);
+            }}
           />
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
@@ -326,9 +334,16 @@ export default function Messages() {
             >
               {!msg.isOwn && (
                 <img
-                  src={senderDetails.avatar || 'https://via.placeholder.com/40'}
+                  src={senderDetails.avatar}
                   alt={senderDetails.name}
                   className="w-8 h-8 rounded-full object-cover mr-3 flex-shrink-0"
+                  onError={(e) => {
+                    console.error('Message avatar failed to load:', senderDetails.avatar);
+                    e.currentTarget.src = 'https://via.placeholder.com/40';
+                  }}
+                  onLoad={() => {
+                    console.log('Message avatar loaded successfully:', senderDetails.avatar);
+                  }}
                 />
               )}
               <div
@@ -339,9 +354,9 @@ export default function Messages() {
                 }`}
               >
                 {msg.type === 'SYSTEM' ? (
-                    <p className="text-xs text-center text-gray-500 italic">{msg.content}</p>
+                  <p className="text-xs text-center text-gray-500 italic">{msg.content}</p>
                 ) : (
-                    <p>{msg.content}</p>
+                  <p>{msg.content}</p>
                 )}
                 <span className={`block text-xs mt-1 ${msg.isOwn ? 'text-emerald-100' : 'text-gray-500'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -349,15 +364,19 @@ export default function Messages() {
               </div>
               {msg.isOwn && (
                 <img
-                  src={senderDetails.avatar || 'https://via.placeholder.com/40'}
+                  src={senderDetails.avatar}
                   alt={senderDetails.name}
                   className="w-8 h-8 rounded-full object-cover ml-3 flex-shrink-0"
+                  onError={(e) => {
+                    console.error('Own message avatar failed to load:', senderDetails.avatar);
+                    e.currentTarget.src = 'https://via.placeholder.com/40';
+                  }}
                 />
               )}
             </div>
           );
         })}
-        <div ref={messagesEndRef} /> {/* Scroll target */}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Message Input */}
@@ -383,7 +402,7 @@ export default function Messages() {
 
         <button
           onClick={handleSendMessage}
-          disabled={!messageText.trim() || !isConnected || !conversationId} // Disable if no conversation selected
+          disabled={!messageText.trim() || !isConnected || !conversationId}
           className="bg-emerald-500 text-white p-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Send className="w-5 h-5" />

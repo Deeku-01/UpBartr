@@ -92,10 +92,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         } fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:hidden shadow-lg`}
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <Link to="/dashboard" className="flex items-center text-xl font-bold text-emerald-600 dark:text-emerald-400">
-            {/* Changed logo name */}
-            UpBartr
-          </Link>
+          <div className='flex justify-center items-center'>
+                    <Link to="/dashboard" className="flex justify-center items-center text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                    UpBartr
+                  </Link>
+          </div>
+
           <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
             <X className="w-6 h-6" />
           </button>
@@ -104,7 +106,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="flex items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 mb-4">
             <img
               className="h-10 w-10 rounded-full object-cover mr-3"
-              src={currentUserProfile?.avatar || 'https://via.placeholder.com/50'}
+              src={currentUserProfile?.avatar || ''}
               alt="User Avatar"
             />
             <div>
@@ -192,7 +194,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 mb-4">
               <img
                 className="h-10 w-10 rounded-full object-cover mr-3"
-                src={currentUserProfile?.avatar || 'https://via.placeholder.com/50'}
+                src={currentUserProfile?.avatar || ''}
                 alt="User Avatar"
               />
               <div>
@@ -233,7 +235,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </li>
               ))}
             </ul>
-            <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700 mx-2">
+            {/* <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700 mx-2">
               <Link
                 to="/dashboard/settings"
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md
@@ -254,14 +256,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 />
                 Settings
               </Link>
-              <button
+               <button
                 onClick={handleLogout}
                 className="group flex items-center w-full px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white mt-1"
               >
                 <LogOut className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" aria-hidden="true" />
                 Sign Out
-              </button>
-            </div>
+              </button> 
+            </div> */}
           </nav>
         </div>
       </div>
@@ -312,7 +314,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <img
                     className="h-8 w-8 rounded-full object-cover"
-                    src={currentUserProfile?.avatar || 'https://via.placeholder.com/50'}
+                    src={currentUserProfile?.avatar || ''}
                     alt="User Avatar"
                   />
                   <span className="hidden sm:block text-gray-800 dark:text-white text-sm font-medium">
