@@ -1,8 +1,8 @@
 // src/components/ConversationList.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Loader2, MessageCircle, Info } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom'; // Import useParams
+import { Loader2, MessageCircle, Info, Search } from 'lucide-react'; // Import Search icon
 import { api } from '../utils/setAuthToken'; // Import your configured axios instance
 import { useSocket } from '../../contexts/SocketProvider'; // Import the useSocket hook
 
@@ -54,7 +54,7 @@ interface Conversation {
   timestamp: string; // ISO string for the last message's timestamp
   unreadCount: number;
   skillRequest?: ConversationSkillRequest; // Updated to be an object or undefined
-  isStarred: boolean;
+  isStarred: boolean; // Assuming this might be a property, if not, remove
 }
 
 // Interface for a chat message received via Socket.IO (should match backend emit structure)
@@ -73,10 +73,12 @@ interface RealtimeChatMessage {
 
 
 export default function ConversationList() {
+  const { conversationId: activeConversationId } = useParams<{ conversationId?: string }>(); // Get active conversation ID from URL
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { socket } = useSocket(); // Get the socket instance from context
+  const [searchQuery, setSearchQuery] = useState(''); // State for search query
 
   const currentUserId = getCurrentUserId();
 
@@ -127,8 +129,10 @@ export default function ConversationList() {
           if (existingConvIndex > -1) {
             // Update existing conversation
             const existingConv = prevConversations[existingConvIndex];
+            // Only increment unread count if the message is not from current user AND
+            // the current conversation is NOT the active one in the chat window
             const newUnreadCount =
-              message.senderId !== currentUserId && message.type === 'CHAT'
+              message.senderId !== currentUserId && message.conversationId !== activeConversationId
                 ? existingConv.unreadCount + 1
                 : existingConv.unreadCount;
 
@@ -139,6 +143,7 @@ export default function ConversationList() {
               unreadCount: newUnreadCount,
             };
 
+            // Move the updated conversation to the top
             updatedConversations = [
               updatedConv,
               ...prevConversations.slice(0, existingConvIndex),
@@ -169,7 +174,7 @@ export default function ConversationList() {
         socket.off('receive_message', handleReceiveMessage);
       };
     }
-  }, [currentUserId, socket]); // Depend on socket to re-run effect when socket connects/disconnects
+  }, [currentUserId, socket, activeConversationId]); // Depend on socket and activeConversationId
 
   const formatTimestamp = (isoString: string): string => {
     const date = new Date(isoString);
@@ -187,6 +192,31 @@ export default function ConversationList() {
       return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
     }
   };
+
+  const handleConversationClick = async (conv: Conversation) => {
+    // When a conversation is clicked, mark its messages as read
+    if (conv.unreadCount > 0 && currentUserId) {
+      try {
+        await api.patch(`/api/messages/${conv.id}/read`); // Assuming a new endpoint for marking as read
+        // Optimistically update the unread count in the local state
+        setConversations(prev => prev.map(c =>
+          c.id === conv.id ? { ...c, unreadCount: 0 } : c
+        ));
+      } catch (err) {
+        console.error('Error marking messages as read:', err);
+        // Optionally show an error to the user
+      }
+    }
+  };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.participant.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.participant.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.participant.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.skillRequest?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
 
   if (loading) {
     return (
@@ -207,59 +237,70 @@ export default function ConversationList() {
     );
   }
 
-  if (conversations.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 bg-white rounded-lg shadow-sm text-gray-500">
-        <MessageCircle className="w-12 h-12 mb-4" />
-        <p className="text-lg font-medium mb-2">No conversations yet.</p>
-        <p className="text-sm text-center">
-          Start a new conversation by messaging a user from their profile or a skill request application.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">Your Conversations</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Conversations</h2>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-        {conversations.map((conv) => (
-          <Link
-            key={conv.id}
-            to={`/dashboard/messages/${conv.id}/${conv.participant.id}`}
-            className="flex items-center p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex-shrink-0 relative">
-              <img
-                src={conv.participant.avatar || 'https://via.placeholder.com/50'}
-                alt={`${conv.participant.firstName} ${conv.participant.lastName}`}
-                className="w-12 h-12 rounded-full object-cover"
-              />
-            </div>
-            <div className="ml-4 flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-base font-semibold text-gray-900 truncate">
-                  {`${conv.participant.firstName} ${conv.participant.lastName}`}
-                </h3>
-                <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                  {formatTimestamp(conv.timestamp)}
-                </span>
+        {filteredConversations.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8 p-4">
+            <MessageCircle className="w-12 h-12 mx-auto mb-3" />
+            <p className="text-lg font-medium mb-2">No conversations found.</p>
+            <p className="text-sm">
+              Try adjusting your search or start a new conversation from a user's profile or a skill request.
+            </p>
+          </div>
+        ) : (
+          filteredConversations.map((conv) => (
+            <Link
+              key={conv.id}
+              to={`/dashboard/messages/${conv.id}/${conv.participant.id}`}
+              onClick={() => handleConversationClick(conv)} // Mark as read on click
+              className={`flex items-center p-4 hover:bg-gray-50 transition-colors ${
+                activeConversationId === conv.id ? 'bg-emerald-50 border-r-4 border-emerald-500' : ''
+              }`}
+            >
+              <div className="flex-shrink-0 relative">
+                <img
+                  src={conv.participant.avatar || 'https://via.placeholder.com/50'}
+                  alt={`${conv.participant.firstName} ${conv.participant.lastName}`}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
               </div>
-              <p className="text-sm text-gray-600 truncate">
-                {conv.skillRequest?.title ? `[${conv.skillRequest.title}] ` : ''}
-                {conv.lastMessage || 'No messages yet.'}
-              </p>
-            </div>
-            {conv.unreadCount > 0 && (
-              <span className="ml-4 flex-shrink-0 bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {conv.unreadCount}
-              </span>
-            )}
-          </Link>
-        ))}
+              <div className="ml-4 flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-base font-semibold text-gray-900 truncate">
+                    {`${conv.participant.firstName} ${conv.participant.lastName}`}
+                  </h3>
+                  <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                    {formatTimestamp(conv.timestamp)}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 truncate">
+                  {conv.skillRequest?.title ? `[${conv.skillRequest.title}] ` : ''}
+                  {conv.lastMessage || 'No messages yet.'}
+                </p>
+              </div>
+              {conv.unreadCount > 0 && (
+                <span className="ml-4 flex-shrink-0 bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {conv.unreadCount}
+                </span>
+              )}
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,10 @@ const client_1 = require("@prisma/client");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
 const db = new client_1.PrismaClient();
+// Helper function to get the Socket.IO instance from the Express app
+const getIo = (req) => {
+    return req.app.get('io');
+};
 // @route   GET /api/conversations
 // @desc    Get a list of conversations for the authenticated user
 // @access  Private
@@ -41,33 +45,39 @@ router.get('/', authMiddleware_1.authenticateToken, async (req, res) => {
                             },
                         },
                         messages: {
-                            orderBy: { timestamp: 'desc' },
-                            take: 1, // Get only the latest message
-                            include: {
-                                sender: { select: { firstName: true, lastName: true, avatar: true } },
-                                skillRequest: { select: { title: true } }, // Include skill request title
+                            // Get the last message for each conversation
+                            orderBy: {
+                                timestamp: 'desc',
+                            },
+                            take: 1,
+                            select: {
+                                content: true,
+                                timestamp: true,
+                                senderId: true,
+                                skillRequestId: true, // Include skillRequestId if present
+                                applicationId: true, // Include applicationId if present
                             },
                         },
                     },
                 },
             },
             orderBy: {
+                // Order conversations by the timestamp of their last message
                 conversation: {
-                    updatedAt: 'desc', // Assuming Conversation has an updatedAt field
+                    messages: {
+                        _count: 'desc', // This is a placeholder, ideally order by last message timestamp
+                    },
                 },
             },
         });
-        const conversations = [];
-        for (const userConv of userConversations) {
-            const conversation = userConv.conversation;
-            if (!conversation)
-                continue;
-            // Find the other participant in this conversation
-            const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId)?.user;
-            if (!otherParticipant)
-                continue; // Skip if no other participant (e.g., malformed data or single-user conversation)
-            const lastMessage = conversation.messages[0]; // Get the latest message
-            // Count unread messages for this conversation where the current user is the receiver
+        const conversations = await Promise.all(userConversations.map(async (cp) => {
+            const conversation = cp.conversation;
+            const otherParticipant = conversation.participants.find((p) => p.user.id !== currentUserId)?.user;
+            if (!otherParticipant) {
+                // This should ideally not happen for 1-on-1 chats if participants are correctly managed
+                return null;
+            }
+            // Count unread messages for the current user in this conversation
             const unreadCount = await db.message.count({
                 where: {
                     conversationId: conversation.id,
@@ -75,19 +85,23 @@ router.get('/', authMiddleware_1.authenticateToken, async (req, res) => {
                     read: false,
                 },
             });
-            // If a skillRequestId filter is applied, check if any message in this conversation is linked to it
-            if (skillRequestIdFilter) {
-                const hasMatchingSkillRequest = await db.message.count({
-                    where: {
-                        conversationId: conversation.id,
-                        skillRequestId: skillRequestIdFilter,
-                    },
-                }) > 0;
-                if (!hasMatchingSkillRequest) {
-                    continue; // Skip this conversation if it doesn't match the skillRequestId filter
-                }
+            // Determine if there's an associated skill request or application
+            let associatedSkillRequestTitle;
+            if (conversation.messages.length > 0 && conversation.messages[0].skillRequestId) {
+                const sr = await db.skillRequest.findUnique({
+                    where: { id: conversation.messages[0].skillRequestId },
+                    select: { title: true },
+                });
+                associatedSkillRequestTitle = sr?.title;
             }
-            conversations.push({
+            else if (conversation.messages.length > 0 && conversation.messages[0].applicationId) {
+                const app = await db.application.findUnique({
+                    where: { id: conversation.messages[0].applicationId },
+                    select: { skillRequest: { select: { title: true } } },
+                });
+                associatedSkillRequestTitle = app?.skillRequest?.title;
+            }
+            return {
                 id: conversation.id,
                 participant: {
                     id: otherParticipant.id,
@@ -96,154 +110,169 @@ router.get('/', authMiddleware_1.authenticateToken, async (req, res) => {
                     avatar: otherParticipant.avatar,
                     username: otherParticipant.username,
                 },
-                lastMessage: lastMessage ? lastMessage.content : 'No messages yet.',
-                timestamp: lastMessage ? lastMessage.timestamp.toISOString() : conversation.createdAt.toISOString(),
+                lastMessage: conversation.messages[0]?.content || null,
+                timestamp: conversation.messages[0]?.timestamp || conversation.createdAt,
                 unreadCount: unreadCount,
-                skillRequest: lastMessage?.skillRequest?.title || 'General Chat', // Get title from message's skillRequest
-                isStarred: false, // Placeholder, implement if you add starring functionality to Conversation model
-            });
-        }
-        res.json(conversations);
+                skillRequest: associatedSkillRequestTitle ? { title: associatedSkillRequestTitle } : undefined,
+            };
+        }));
+        // Filter out any nulls if otherParticipant was not found
+        const filteredConversations = conversations.filter(Boolean);
+        // Further filter by skillRequestId if provided (this is a client-side filter for now)
+        const finalConversations = skillRequestIdFilter
+            ? filteredConversations.filter(conv => conv?.skillRequest?.title?.includes(skillRequestIdFilter))
+            : filteredConversations;
+        // Sort by latest message timestamp
+        finalConversations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        res.status(200).json(finalConversations);
     }
     catch (error) {
         console.error('Error fetching conversations:', error);
         res.status(500).json({ error: 'Failed to fetch conversations.' });
     }
 });
-// @route   POST /api/conversations/initiate
-// @desc    Initiate a conversation with another user (finds existing or creates new)
+// @route   POST /api/conversations
+// @desc    Create a new conversation or get an existing one between two users
 // @access  Private
 // @ts-ignore
-router.post('/initiate', authMiddleware_1.authenticateToken, async (req, res) => {
+router.post('/', authMiddleware_1.authenticateToken, async (req, res) => {
     const currentUserId = req.user?.id;
-    const { otherUserId, skillRequestId, applicationId, initialMessage } = req.body; // Added skillRequestId, applicationId, initialMessage
-    if (!currentUserId) {
-        return res.status(401).json({ error: 'Authentication required.' });
-    }
-    if (!otherUserId) {
-        return res.status(400).json({ error: 'Other user ID is required to initiate a conversation.' });
-    }
-    if (currentUserId === otherUserId) {
-        return res.status(400).json({ error: 'Cannot initiate a conversation with yourself.' });
+    const { otherUserId, skillRequestId, applicationId } = req.body; // otherUserId is the ID of the person to chat with
+    if (!currentUserId || !otherUserId || currentUserId === otherUserId) {
+        return res.status(400).json({ error: 'Invalid participant IDs.' });
     }
     try {
-        // 1. Find an existing conversation that includes both users
-        // This requires checking the ConversationParticipant model
-        const existingConversationParticipants = await db.conversationParticipant.findMany({
+        // 1. Check if a conversation already exists between these two users
+        // Find conversations where currentUserId is a participant
+        const conversationsWithCurrentUser = await db.conversationParticipant.findMany({
             where: {
-                userId: { in: [currentUserId, otherUserId] },
+                userId: currentUserId,
             },
             select: {
                 conversationId: true,
             },
         });
-        // Group by conversationId to find conversations with both participants
-        const conversationCounts = new Map();
-        for (const cp of existingConversationParticipants) {
-            conversationCounts.set(cp.conversationId, (conversationCounts.get(cp.conversationId) || 0) + 1);
-        }
-        let existingConversationId = null;
-        for (const [convId, count] of conversationCounts.entries()) {
-            // For a 1-on-1 chat, we expect count of 2 (both participants)
-            if (count === 2) {
-                // Optionally, if you want to link it to a specific skillRequest or application,
-                // you might need to query messages within that conversation
-                // For simplicity here, we'll just take the first 1-on-1 found.
-                existingConversationId = convId;
-                break;
-            }
-        }
-        let conversation;
-        if (existingConversationId) {
-            conversation = await db.conversation.findUnique({
-                where: { id: existingConversationId },
-                select: { id: true },
-            });
-            return res.status(200).json({ conversationId: conversation?.id, message: 'Conversation already exists.' });
-        }
-        // 2. If no conversation exists, create a new one
-        conversation = await db.conversation.create({
-            data: {
-                createdAt: new Date(),
-                updatedAt: new Date(),
+        const currentUserConversationIds = conversationsWithCurrentUser.map(cp => cp.conversationId);
+        // From those, find if otherUserId is also a participant and it's a 2-person chat
+        const existingConversation = await db.conversation.findFirst({
+            where: {
+                id: { in: currentUserConversationIds },
                 participants: {
-                    create: [
-                        { userId: currentUserId },
-                        { userId: otherUserId },
-                    ],
+                    some: {
+                        userId: otherUserId,
+                    },
                 },
+                // Ensure it's a 1-on-1 conversation
+                AND: {
+                    participants: {
+                        every: {
+                            userId: { in: [currentUserId, otherUserId] },
+                        },
+                    }
+                }
             },
-            select: {
-                id: true,
-            },
-        });
-        // Optionally, create an initial message
-        if (initialMessage) {
-            await db.message.create({
-                data: {
-                    conversationId: conversation.id,
-                    senderId: currentUserId,
-                    receiverId: otherUserId, // Explicitly set receiver for 1-on-1
-                    content: initialMessage,
-                    type: 'CHAT', // Or 'SYSTEM' if it's an auto-generated welcome
-                    read: false,
-                    timestamp: new Date(),
-                    skillRequestId: skillRequestId || null,
-                    applicationId: applicationId || null,
-                },
-            });
-        }
-        res.status(201).json({ conversationId: conversation.id, message: 'New conversation created.' });
-    }
-    catch (error) {
-        console.error('Error initiating conversation:', error);
-        res.status(500).json({ error: 'Failed to initiate conversation.' });
-    }
-});
-// @route   POST /api/conversations/:conversationId/messages
-// @desc    Send a message in a conversation
-// @access  Private
-// @ts-ignore
-router.post('/:conversationId/messages', authMiddleware_1.authenticateToken, async (req, res) => {
-    const { conversationId } = req.params;
-    const { content, type = 'CHAT', skillRequestId = null, applicationId = null } = req.body; // Default type to CHAT
-    const currentUserId = req.user?.id;
-    if (!currentUserId) {
-        return res.status(401).json({ error: 'Authentication required.' });
-    }
-    if (!content) {
-        return res.status(400).json({ error: 'Message content cannot be empty.' });
-    }
-    try {
-        // Verify the conversation exists and the current user is a participant
-        const conversation = await db.conversation.findUnique({
-            where: { id: conversationId },
             include: {
                 participants: {
-                    select: { userId: true }
+                    select: {
+                        userId: true
+                    }
                 }
             }
         });
-        if (!conversation) {
-            return res.status(404).json({ error: 'Conversation not found.' });
+        if (existingConversation) {
+            // Double-check if it's truly a 2-person conversation with *only* these two
+            const participantIdsInFoundConversation = existingConversation.participants.map(p => p.userId);
+            if (participantIdsInFoundConversation.length === 2 &&
+                participantIdsInFoundConversation.includes(currentUserId) &&
+                participantIdsInFoundConversation.includes(otherUserId)) {
+                console.log(`Existing conversation found: ${existingConversation.id}`);
+                return res.status(200).json({
+                    conversationId: existingConversation.id,
+                    otherParticipantId: otherUserId,
+                    message: 'Existing conversation retrieved.'
+                });
+            }
         }
-        const participantUserIds = conversation.participants.map(p => p.userId);
-        if (!participantUserIds.includes(currentUserId)) {
+        // 2. If no existing conversation, create a new one
+        const newConversation = await db.$transaction(async (tx) => {
+            const conversation = await tx.conversation.create({
+                data: {
+                    participants: {
+                        create: [
+                            { userId: currentUserId },
+                            { userId: otherUserId }
+                        ]
+                    }
+                }
+            });
+            // Optionally create a system message to indicate the conversation start
+            let systemMessageContent = `Conversation started.`;
+            if (skillRequestId) {
+                const skillReq = await tx.skillRequest.findUnique({ where: { id: skillRequestId }, select: { title: true } });
+                systemMessageContent = `Conversation started regarding skill request: "${skillReq?.title || 'Unknown Skill Request'}"`;
+            }
+            else if (applicationId) {
+                const application = await tx.application.findUnique({
+                    where: { id: applicationId },
+                    select: { skillRequest: { select: { title: true } } }
+                });
+                systemMessageContent = `Conversation started regarding application for skill request: "${application?.skillRequest?.title || 'Unknown Skill Request'}"`;
+            }
+            await tx.message.create({
+                data: {
+                    conversationId: conversation.id,
+                    senderId: currentUserId, // The user who initiated the chat
+                    receiverId: otherUserId,
+                    content: systemMessageContent,
+                    type: 'SYSTEM',
+                    skillRequestId: skillRequestId,
+                    applicationId: applicationId,
+                },
+            });
+            return conversation;
+        });
+        res.status(201).json({
+            conversationId: newConversation.id,
+            otherParticipantId: otherUserId,
+            message: 'New conversation created successfully.'
+        });
+    }
+    catch (error) {
+        console.error('Error creating/getting conversation:', error);
+        res.status(500).json({ error: 'Failed to create/get conversation.' });
+    }
+});
+// @route   POST /api/conversations/messages
+// @desc    Send a new message within a conversation
+// @access  Private
+// @ts-ignore
+router.post('/messages', authMiddleware_1.authenticateToken, async (req, res) => {
+    const currentUserId = req.user?.id;
+    const { conversationId, receiverId, content, skillRequestId, applicationId } = req.body; // receiverId is the other participant in a 1-on-1 chat
+    if (!currentUserId || !content || !conversationId || !receiverId) {
+        return res.status(400).json({ error: 'Sender ID, receiver ID, conversation ID, and content are required.' });
+    }
+    try {
+        // Verify that the current user is a participant in the conversation
+        const isParticipant = await db.conversationParticipant.findFirst({
+            where: {
+                conversationId: conversationId,
+                userId: currentUserId,
+            },
+        });
+        if (!isParticipant) {
             return res.status(403).json({ error: 'Not authorized to send messages in this conversation.' });
         }
-        // Determine the receiverId for a 1-on-1 chat
-        const receiverId = participantUserIds.find(id => id !== currentUserId) || null;
+        // Create the new message
         const newMessage = await db.message.create({
             data: {
-                conversationId,
+                conversationId: conversationId,
                 senderId: currentUserId,
-                receiverId, // Set the other participant as receiver
-                content,
-                type,
-                skillRequestId,
-                applicationId,
-                timestamp: new Date(),
-                read: false, // Mark as unread for the receiver
+                receiverId: receiverId, // The other participant
+                content: content,
+                type: 'CHAT', // Default to CHAT type for user-sent messages
+                skillRequestId: skillRequestId,
+                applicationId: applicationId,
             },
             include: {
                 sender: {
@@ -255,12 +284,8 @@ router.post('/:conversationId/messages', authMiddleware_1.authenticateToken, asy
                 },
             },
         });
-        // Update conversation's updatedAt to bring it to top of list
-        await db.conversation.update({
-            where: { id: conversationId },
-            data: { updatedAt: new Date() },
-        });
-        const io = req.app.get('io'); // Get the Socket.IO instance from the app
+        // Emit the message via Socket.IO to the conversation room
+        const io = getIo(req);
         if (io) {
             const messageToEmit = {
                 id: newMessage.id,
@@ -269,13 +294,12 @@ router.post('/:conversationId/messages', authMiddleware_1.authenticateToken, asy
                 receiverId: newMessage.receiverId,
                 content: newMessage.content,
                 timestamp: newMessage.timestamp.toISOString(),
-                isOwn: false, // This will be set to true on the sender's frontend, false for receiver
+                isOwn: newMessage.senderId === currentUserId, // For the client receiving it
                 type: newMessage.type,
                 senderName: `${newMessage.sender.firstName} ${newMessage.sender.lastName}`,
-                senderAvatar: newMessage.sender.avatar
+                senderAvatar: newMessage.sender.avatar,
             };
-            // Emit the message to all clients in this specific conversation room
-            io.to(conversation.id).emit('receive_message', messageToEmit); // Use conversation.id
+            io.to(conversationId).emit('receive_message', messageToEmit); // Use conversation.id
         }
         res.status(201).json({
             id: newMessage.id,
@@ -286,7 +310,7 @@ router.post('/:conversationId/messages', authMiddleware_1.authenticateToken, asy
             isOwn: newMessage.senderId === currentUserId, // This is for the sender's immediate UI update
             type: newMessage.type,
             senderName: `${newMessage.sender.firstName} ${newMessage.sender.lastName}`,
-            senderAvatar: newMessage.sender.avatar
+            senderAvatar: newMessage.sender.avatar,
         });
     }
     catch (error) {
@@ -314,7 +338,7 @@ router.get('/stats', authMiddleware_1.authenticateToken, async (req, res) => {
     }
     catch (error) {
         console.error('Error fetching conversation stats:', error);
-        res.status(500).json({ error: 'Failed to fetch conversation statistics.' });
+        res.status(500).json({ error: 'Failed to fetch conversation stats.' });
     }
 });
 exports.default = router;

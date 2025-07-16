@@ -12,6 +12,7 @@ const user_1 = __importDefault(require("./routes/user"));
 const application_1 = __importDefault(require("./routes/application"));
 const skillrequests_1 = __importDefault(require("./routes/skillrequests"));
 const conversations_1 = __importDefault(require("./routes/conversations")); // NEW: Import conversation routes
+const messages_1 = __importDefault(require("./routes/messages"));
 // Import middleware
 const authMiddleware_1 = require("./middleware/authMiddleware");
 const app = (0, express_1.default)();
@@ -22,6 +23,7 @@ app.use('/api/skillreqs', skillrequests_1.default);
 app.use('/api/auth', auth_1.default);
 app.use('/api/users', user_1.default);
 app.use('/api/skills', application_1.default); // Applications routes
+app.use('/api/messages', messages_1.default);
 app.use('/api/conversations', authMiddleware_1.authenticateToken, conversations_1.default); // NEW: Register conversation routes
 // Note: `authenticateToken` is applied here so all conversation routes are protected.
 // 404 handler
