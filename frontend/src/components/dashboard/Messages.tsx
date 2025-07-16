@@ -14,22 +14,14 @@ import {
 import { useSocket } from '../../contexts/SocketProvider';
 import { api } from '../utils/setAuthToken'; // Use your configured axios instance
 
-// Helper function to get current user's details.
-// Only userId is retrieved from localStorage as per request.
-// firstName, lastName, and avatar will use default values.
-const getCurrentUser = (): { id: string | null; name: string; avatar: string } => {
-  const userId = localStorage.getItem('userId');
-  // Default values for firstName, lastName, and avatar as they are no longer from localStorage
-  const firstName = 'You'; // Default first name
-  const lastName = '';    // Default last name
-  const avatar = ''; // Default avatar
-
-  return {
-    id: userId,
-    name: `${firstName} ${lastName}`.trim(),
-    avatar: avatar,
-  };
-};
+// Interface for the current authenticated user's profile
+interface CurrentUserProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatar?: string;
+  username?: string; // Assuming username might also be available
+}
 
 interface ChatMessage {
   id: string;
@@ -76,17 +68,31 @@ export default function Messages() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState('');
   const [otherParticipant, setOtherParticipant] = useState<OtherParticipantDetails | null>(null); // State to hold other participant's details
+  const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null); // State for current user's profile
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { socket, isConnected } = useSocket(); // Get socket and isConnected from context
-  const currentUser = getCurrentUser(); // Get current user details using the updated helper
 
   // Scroll to the latest message
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Fetch current user's profile
+  useEffect(() => {
+    const fetchCurrentUserProfile = async () => {
+      try {
+        const response = await api.get<CurrentUserProfile>('/api/users/profile');
+        setCurrentUserProfile(response.data);
+      } catch (err) {
+        console.error('Error fetching current user profile:', err);
+        // Handle error, e.g., redirect to login or show a message
+      }
+    };
+    fetchCurrentUserProfile();
+  }, []); // Run once on component mount
 
   // Fetch other participant's details
   useEffect(() => {
@@ -111,7 +117,8 @@ export default function Messages() {
   // Fetch messages for the selected conversation
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!conversationId) {
+      // Wait for currentUserProfile to be loaded before fetching messages
+      if (!conversationId || !currentUserProfile?.id) {
         setMessages([]);
         setLoading(false);
         setOtherParticipant(null); // Clear participant if no conversation
@@ -125,7 +132,7 @@ export default function Messages() {
         // Mark messages as own or not based on senderId
         const fetchedMessages = response.data.map(msg => ({
           ...msg,
-          isOwn: msg.senderId === currentUser.id,
+          isOwn: msg.senderId === currentUserProfile.id, // Use currentUserProfile.id
         }));
         setMessages(fetchedMessages);
         scrollToBottom(); // Scroll after initial load
@@ -154,11 +161,11 @@ export default function Messages() {
         console.log(`Left Socket.IO room: ${conversationId}`);
       }
     };
-  }, [conversationId, currentUser.id, socket, isConnected]); // Re-fetch messages if conversationId or currentUser changes
+  }, [conversationId, currentUserProfile?.id, socket, isConnected]); // Re-fetch messages if conversationId or currentUserProfile changes
 
   // Listen for real-time messages
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !currentUserProfile?.id) return; // Ensure currentUserProfile is loaded
 
     const handleReceiveMessage = (data: RealtimeChatMessage) => {
       // Only add the message if it belongs to the currently active conversation
@@ -167,7 +174,7 @@ export default function Messages() {
           ...prevMessages,
           {
             ...data,
-            isOwn: data.senderId === currentUser.id, // Determine if it's the current user's message
+            isOwn: data.senderId === currentUserProfile.id, // Use currentUserProfile.id
           },
         ]);
         scrollToBottom(); // Scroll after new message
@@ -179,19 +186,17 @@ export default function Messages() {
     return () => {
       socket.off('receive_message', handleReceiveMessage);
     };
-  }, [socket, conversationId, currentUser.id]); // Re-attach listener if socket, convoId, or currentUser changes
+  }, [socket, conversationId, currentUserProfile?.id]); // Re-attach listener if socket, convoId, or currentUserProfile changes
 
   // Scroll to bottom when messages update (debounced or only on new message)
-  // This useEffect is now less critical as individual message additions trigger scroll
-  // but kept for robustness, e.g., if messages are re-ordered or bulk-added.
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !conversationId || !otherParticipantId) {
-      return;
+    if (!messageText.trim() || !conversationId || !otherParticipantId || !currentUserProfile?.id) {
+      return; // Ensure current user profile is loaded
     }
 
     try {
@@ -203,8 +208,6 @@ export default function Messages() {
       });
 
       // Optimistically update UI with the sent message
-      // The backend response already includes `isOwn` and `senderName`/`senderAvatar`
-      // which is good for consistency.
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -224,20 +227,23 @@ export default function Messages() {
   // Helper to display sender name/avatar for messages
   const getSenderDetails = (message: ChatMessage) => {
     if (message.isOwn) {
-      // Use currentUser.avatar, which now handles empty string fallbacks
-      return { name: currentUser.name, avatar: currentUser.avatar };
+      // Use currentUserProfile for the current user's details
+      return {
+        name: `${currentUserProfile?.firstName || 'You'} ${currentUserProfile?.lastName || ''}`.trim(),
+        avatar: currentUserProfile?.avatar || 'https://via.placeholder.com/40'
+      };
     }
     // For messages not from current user, sender details come directly from `message.senderName/senderAvatar`
-    // which are populated by backend's `include: { sender: ... }`
-    return { name: message.senderName, avatar: message.senderAvatar }
+    return { name: message.senderName, avatar: message.senderAvatar };
   };
 
 
-  if (loading) {
+  // Show loading state if current user profile is not yet loaded
+  if (!currentUserProfile || loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
-        <p className="ml-3">Loading messages...</p>
+        <p className="ml-3">Loading chat...</p>
       </div>
     );
   }
@@ -343,8 +349,8 @@ export default function Messages() {
               </div>
               {msg.isOwn && (
                 <img
-                  src={currentUser.avatar || 'https://via.placeholder.com/40'}
-                  alt={currentUser.name}
+                  src={senderDetails.avatar || 'https://via.placeholder.com/40'}
+                  alt={senderDetails.name}
                   className="w-8 h-8 rounded-full object-cover ml-3 flex-shrink-0"
                 />
               )}

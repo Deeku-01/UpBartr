@@ -1,4 +1,4 @@
-// src/App.tsx (No changes needed here from your last provided code, it already points to Dashboard correctly)
+// src/App.tsx
 
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
@@ -6,26 +6,15 @@ import Dashboard from './pages/DashBoard'; // This will now handle nested routes
 import { useEffect, useRef, useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SocketProvider } from './contexts/SocketProvider';
-// ConversationList and Messages are now imported and used inside MessagesPageWrapper/Dashboard.tsx
-// import ConversationList from './components/dashboard/ConversationList';
-// import Messages from './components/dashboard/Messages';
+// Removed jwtDecode as we are now directly reading userId from localStorage
+// import { jwtDecode } from 'jwt-decode';
+import { MessageCircle } from 'lucide-react';
 
-import { jwtDecode } from 'jwt-decode';
-import { MessageCircle } from 'lucide-react'; // Still used in MessagesPageWrapper, keep this import for now if not already there.
-
-// Helper function to get userId from token
+// Helper function to get userId directly from localStorage
 const getCurrentUserId = (): string | null => {
-  const token = localStorage.getItem('authToken'); // This will now get just the JWT string
-  if (token) {
-    try {
-      const decoded: any = jwtDecode(token);
-      return decoded.userId || decoded.sub || null; // Adjust to your actual JWT claim for user ID
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
-  }
-  return null;
+  const userId = localStorage.getItem('userId');
+  console.log('Retrieved userId directly from localStorage:', userId); // Debugging: See retrieved ID
+  return userId; // userId will be null if not found
 };
 
 // Create a separate component for the navigation logic
@@ -37,7 +26,7 @@ function AppContent() {
   useEffect(() => {
     if (hasInitialized.current) return;
 
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken'); // Still check token for navigation logic
     const currentPath = location.pathname;
     const isInitialLoad = !sessionStorage.getItem('appHasLoaded');
 
@@ -65,12 +54,10 @@ function AppContent() {
 }
 
 function App() {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(getCurrentUserId()); // Initialize with current user ID
 
   useEffect(() => {
-    const userId = getCurrentUserId();
-    setCurrentUserId(userId);
-
+    // Listen for auth changes (e.g., login/logout)
     const handleAuthChange = () => {
       setCurrentUserId(getCurrentUserId());
     };
@@ -81,23 +68,22 @@ function App() {
     };
   }, []);
 
-  if (currentUserId === null) {
-      return (
-        <Router>
-          <ThemeProvider>
-            <AppContent />
-          </ThemeProvider>
-        </Router>
-      );
-  }
-
+  // Ensure SocketProvider is always rendered if a userId is available,
+  // wrapping the main content that might need it.
   return (
     <Router>
-      <SocketProvider currentUserId={currentUserId}>
-        <ThemeProvider>
+      <ThemeProvider>
+        {/* Conditionally render SocketProvider around AppContent if currentUserId is available */}
+        {currentUserId ? (
+          <SocketProvider currentUserId={currentUserId}>
+            <AppContent />
+          </SocketProvider>
+        ) : (
+          // If no currentUserId, render AppContent without SocketProvider
+          // Routes within AppContent (like Dashboard) will handle their own auth checks
           <AppContent />
-        </ThemeProvider>
-      </SocketProvider>
+        )}
+      </ThemeProvider>
     </Router>
   );
 }
