@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, SkillRequestStatus } from '@prisma/client';
 import { Router } from 'express';
+import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = Router();
 const db = new PrismaClient();
@@ -124,6 +125,249 @@ router.get('/requests/user', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch skill requests' });
   }
 });
+
+// @route   GET /api/skillreqs/:id
+// @desc    Get a single Skill request by ID
+// @access  Public (or Private if you add authenticateToken)
+// @ts-ignore
+router.get('/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const skillRequest = await db.skillRequest.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatar: true,
+            rating: true,
+            location: true,
+            bio: true,
+            isVerified: true,
+          },
+        },
+        applications: {
+          include: {
+            applicant: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+                avatar: true,
+                rating: true,
+              },
+            },
+          },
+        },
+        views: true, // Include all view records
+      },
+    });
+
+    if (!skillRequest) {
+      return res.status(404).json({ error: 'Skill request not found.' });
+    }
+
+    // Transform data for consistent frontend usage
+    const transformedRequest = {
+      ...skillRequest,
+      deadline: skillRequest.deadline?.toISOString() || null,
+      createdAt: skillRequest.createdAt.toISOString(),
+      updatedAt: skillRequest.updatedAt.toISOString(),
+      author: {
+        id: skillRequest.author.id,
+        firstName: skillRequest.author.firstName,
+        lastName: skillRequest.author.lastName,
+        username: skillRequest.author.username,
+        avatar: skillRequest.author.avatar,
+        rating: skillRequest.author.rating,
+        location: skillRequest.author.location,
+        bio: skillRequest.author.bio,
+        isVerified: skillRequest.author.isVerified,
+      },
+      applications: skillRequest.applications.map(app => ({
+        ...app,
+        createdAt: app.createdAt.toISOString(),
+        respondedAt: app.respondedAt?.toISOString() || null,
+        startedAt: app.startedAt?.toISOString() || null,
+        completedAt: app.completedAt?.toISOString() || null,
+      })),
+      viewsCount: skillRequest.views.length, // Add a count for views
+    };
+
+    res.json(transformedRequest);
+  } catch (error) {
+    console.error('Error fetching skill request by ID:', error);
+    res.status(500).json({ error: 'Failed to fetch skill request.' });
+  }
+});
+
+
+// @route   POST /api/skillreqs
+// @desc    Create a new Skill request
+// @access  Private
+// @ts-ignore
+router.post('/', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const {
+    title,
+    description,
+    skillNeeded,
+    skillOffered,
+    category,
+    estimatedDuration,
+    deadline,
+    location,
+    isRemote,
+    requirements,
+    deliverables,
+    tags,
+  } = req.body;
+  const authorId = req.user?.id;
+
+  if (!authorId) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  // Basic validation
+  if (!title || !description || !skillNeeded || !skillOffered || !category || !requirements || !deliverables || !tags) {
+    return res.status(400).json({ error: 'Please fill in all required fields.' });
+  }
+
+  try {
+    const newSkillRequest = await db.skillRequest.create({
+      data: {
+        authorId,
+        title,
+        description,
+        skillNeeded,
+        skillOffered,
+        category,
+        estimatedDuration: estimatedDuration || null,
+        deadline: deadline ? new Date(deadline) : null,
+        location: location || null,
+        isRemote: isRemote || false,
+        requirements,
+        deliverables,
+        tags,
+        status: SkillRequestStatus.OPEN, // Default status
+      },
+    });
+    res.status(201).json(newSkillRequest);
+  } catch (error) {
+    console.error('Error creating skill request:', error);
+    res.status(500).json({ error: 'Failed to create skill request.' });
+  }
+});
+
+// @route   PUT /api/skillreqs/:id
+// @desc    Update a Skill request
+// @access  Private (only author can update)
+// @ts-ignore
+router.put('/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const {
+    title,
+    description,
+    skillNeeded,
+    skillOffered,
+    category,
+    estimatedDuration,
+    deadline,
+    location,
+    isRemote,
+    requirements,
+    deliverables,
+    tags,
+    status, // Allow status update
+    acceptedApplicantId, // Allow updating accepted applicant
+  } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  try {
+    const existingRequest = await db.skillRequest.findUnique({
+      where: { id },
+    });
+
+    if (!existingRequest) {
+      return res.status(404).json({ error: 'Skill request not found.' });
+    }
+
+    if (existingRequest.authorId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to update this skill request.' });
+    }
+
+    const updatedSkillRequest = await db.skillRequest.update({
+      where: { id },
+      data: {
+        title: title ?? existingRequest.title,
+        description: description ?? existingRequest.description,
+        skillNeeded: skillNeeded ?? existingRequest.skillNeeded,
+        skillOffered: skillOffered ?? existingRequest.skillOffered,
+        category: category ?? existingRequest.category,
+        estimatedDuration: estimatedDuration ?? existingRequest.estimatedDuration,
+        deadline: deadline ? new Date(deadline) : existingRequest.deadline,
+        location: location ?? existingRequest.location,
+        isRemote: isRemote ?? existingRequest.isRemote,
+        requirements: requirements ?? existingRequest.requirements,
+        deliverables: deliverables ?? existingRequest.deliverables,
+        tags: tags ?? existingRequest.tags,
+        status: status ?? existingRequest.status,
+        acceptedApplicantId: acceptedApplicantId ?? existingRequest.acceptedApplicantId,
+      },
+    });
+    res.json(updatedSkillRequest);
+  } catch (error) {
+    console.error('Error updating skill request:', error);
+    res.status(500).json({ error: 'Failed to update skill request.' });
+  }
+});
+
+// @route   DELETE /api/skillreqs/:id
+// @desc    Delete a Skill request
+// @access  Private (only author can delete)
+// @ts-ignore
+router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  try {
+    const existingRequest = await db.skillRequest.findUnique({
+      where: { id },
+    });
+
+    if (!existingRequest) {
+      return res.status(404).json({ error: 'Skill request not found.' });
+    }
+
+    if (existingRequest.authorId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this skill request.' });
+    }
+
+    await db.skillRequest.delete({
+      where: { id },
+    });
+    res.status(204).send(); // No content
+  } catch (error) {
+    console.error('Error deleting skill request:', error);
+    res.status(500).json({ error: 'Failed to delete skill request.' });
+  }
+});
+
+
+
+
 
 
 export default router;

@@ -1,316 +1,276 @@
-import { useState } from 'react';
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import { useState, useEffect } from 'react';
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   Eye,
   MessageCircle,
-  Star,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
+import { api } from '../utils/setAuthToken'; // Import the configured axios instance
+import { SkeletonCardReq } from '../lib/skeleton'; // Assuming you have a skeleton for applications
+import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
 
-const mockApplications = [
-  {
-    id: 1,
-    skillRequest: {
-      title: 'Brand Identity Design for Startup',
-      author: 'Elena Rodriguez',
-      avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    status: 'ACCEPTED',
-    appliedAt: '2024-01-20',
-    respondedAt: '2024-01-22',
-    message: 'I\'m very interested in this opportunity and believe my skills would be a perfect match...',
-    responseMessage: 'Great application! I\'d love to work with you. Let\'s schedule a call to discuss details.',
-    proposedTimeline: '3 weeks',
-    startedAt: '2024-01-25'
-  },
-  {
-    id: 2,
-    skillRequest: {
-      title: 'Learn Music Production Basics',
-      author: 'Ryan Mitchell',
-      avatar: 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    status: 'PENDING',
-    appliedAt: '2024-01-18',
-    message: 'I have extensive experience in music production and would love to share my knowledge...',
-    proposedTimeline: '6 weeks'
-  },
-  {
-    id: 3,
-    skillRequest: {
-      title: 'Personal Fitness Training Program',
-      author: 'Maya Thompson',
-      avatar: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    status: 'REJECTED',
-    appliedAt: '2024-01-15',
-    respondedAt: '2024-01-17',
-    message: 'I\'m a certified personal trainer with 5+ years of experience...',
-    responseMessage: 'Thank you for your application. We decided to go with someone local for in-person sessions.',
-    proposedTimeline: '2 months'
-  },
-  {
-    id: 4,
-    skillRequest: {
-      title: 'Advanced Photography Techniques',
-      author: 'Marcus Johnson',
-      avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop'
-    },
-    status: 'COMPLETED',
-    appliedAt: '2023-12-10',
-    respondedAt: '2023-12-12',
-    completedAt: '2024-01-15',
-    message: 'I\'d love to learn advanced photography techniques from a professional...',
-    responseMessage: 'Perfect! Your enthusiasm for learning is exactly what I\'m looking for.',
-    proposedTimeline: '4 weeks',
-    rating: 5,
-    review: 'Excellent collaboration! Sarah was a dedicated student and picked up techniques quickly.'
-  }
-];
+// Define the ApplicationStatus enum to match your Prisma schema
+enum ApplicationStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+}
 
-const statusConfig = {
-  PENDING: {
-    color: 'bg-yellow-100 text-yellow-800',
-    icon: Clock,
-    iconColor: 'text-yellow-600'
-  },
-  ACCEPTED: {
-    color: 'bg-green-100 text-green-800',
-    icon: CheckCircle,
-    iconColor: 'text-green-600'
-  },
-  REJECTED: {
-    color: 'bg-red-100 text-red-800',
-    icon: XCircle,
-    iconColor: 'text-red-600'
-  },
-  IN_PROGRESS: {
-    color: 'bg-blue-100 text-blue-800',
-    icon: AlertCircle,
-    iconColor: 'text-blue-600'
-  },
-  COMPLETED: {
-    color: 'bg-purple-100 text-purple-800',
-    icon: CheckCircle,
-    iconColor: 'text-purple-600'
-  }
+// Interface for a single application fetched from the backend
+interface Application {
+  id: string;
+  skillRequestId: string;
+  applicantId: string;
+  message: string;
+  proposedTimeline: string;
+  portfolio?: string[]; // Corrected: Changed to string[] as per your schema
+  experience?: string;
+  whyChooseMe?: string;
+  status: ApplicationStatus;
+  responseMessage?: string;
+  respondedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string; // This is the appliedAt equivalent
+  skillRequest: {
+    id: string;
+    title: string;
+    author: {
+      id: string; // Added author ID for messaging
+      firstName: string;
+      lastName: string;
+      avatar?: string;
+    };
+  };
+}
+
+// Interface for the full API response structure
+interface ApplicationsApiResponse {
+  applications: Application[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+const formatDate = (dateString: string) => {
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
 export default function MyApplications() {
-  const [selectedTab, setSelectedTab] = useState('all');
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<string>('all'); // 'all', 'pending', 'accepted', 'rejected', 'in_progress', 'completed'
+  const navigate = useNavigate(); // Initialize navigate hook
 
-  const tabs = [
-    { id: 'all', name: 'All Applications', count: mockApplications.length },
-    { id: 'pending', name: 'Pending', count: mockApplications.filter(a => a.status === 'PENDING').length },
-    { id: 'accepted', name: 'Accepted', count: mockApplications.filter(a => a.status === 'ACCEPTED').length },
-    { id: 'completed', name: 'Completed', count: mockApplications.filter(a => a.status === 'COMPLETED').length }
-  ];
+  const currentUserId = localStorage.getItem('userId'); // Get current user ID from localStorage
 
-  const filteredApplications = selectedTab === 'all' 
-    ? mockApplications 
-    : mockApplications.filter(a => a.status.toLowerCase() === selectedTab);
+  useEffect(() => {
+    const fetchApplications = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Change the type parameter to ApplicationsApiResponse
+        const response = await api.get<ApplicationsApiResponse>('/api/skills/my-applications');
+        // Access the 'applications' array from the response data
+        if (response.data && Array.isArray(response.data.applications)) {
+          setApplications(response.data.applications);
+          console.log('Applications successfully set. Count:', response.data.applications.length);
+        } else {
+          console.warn('API response for applications was not in expected format or applications array missing:', response.data);
+          setApplications([]); // Default to empty array to prevent errors
+        }
+      } catch (err) {
+        console.error('Error fetching applications:', err);
+        setError('Failed to load applications. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApplications();
+  }, []);
+
+  const getStatusIcon = (status: ApplicationStatus) => {
+    switch (status) {
+      case ApplicationStatus.PENDING:
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      case ApplicationStatus.ACCEPTED:
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case ApplicationStatus.REJECTED:
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case ApplicationStatus.WITHDRAWN:
+        return <AlertCircle className="w-4 h-4 text-gray-500" />;
+      case ApplicationStatus.IN_PROGRESS:
+        return <Clock className="w-4 h-4 text-blue-500" />;
+      case ApplicationStatus.COMPLETED:
+        return <CheckCircle className="w-4 h-4 text-purple-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusText = (status: ApplicationStatus) => {
+    return status.replace(/_/g, ' ').toLowerCase();
+  };
+
+  const filteredApplications = applications.filter(app => {
+    if (selectedTab === 'all') return true;
+    return app.status.toLowerCase() === selectedTab;
+  });
+
+  const handleViewDetails = (applicationId: string) => {
+    navigate(`/dashboard/applications/${applicationId}`);
+  };
+
+  // New function to handle messaging the author of the skill request
+  const handleMessageAuthor = async (authorId: string, skillRequestId: string, skillRequestTitle: string) => {
+    if (!currentUserId) {
+      console.error('Current user ID not found.');
+      return;
+    }
+
+    try {
+      const response = await api.post('/api/conversations', {
+        otherUserId: authorId,
+        skillRequestId: skillRequestId,
+      });
+
+      const { conversationId, otherParticipantId } = response.data;
+      navigate(`/dashboard/messages/${conversationId}/${otherParticipantId}`);
+    } catch (err) {
+      console.error('Error initiating conversation:', err);
+      setError('Failed to start conversation. Please try again.');
+    }
+  };
+
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Applications</h1>
-        <p className="text-gray-600 mt-1">Track your skill exchange applications and their status</p>
-      </div>
+    <div className="container mx-auto p-6 bg-white rounded-lg shadow-md">
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">My Applications</h1>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {mockApplications.filter(a => a.status === 'PENDING').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Accepted</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {mockApplications.filter(a => a.status === 'ACCEPTED').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Star className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Completed</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {mockApplications.filter(a => a.status === 'COMPLETED').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <Star className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-bold text-gray-900">75%</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          {['all', 'pending', 'accepted', 'in_progress', 'completed', 'rejected', 'withdrawn'].map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                selectedTab === tab.id
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              className={`${
+                selectedTab === tab
                   ? 'border-emerald-500 text-emerald-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm capitalize`}
             >
-              {tab.name}
-              <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2.5 rounded-full text-xs">
-                {tab.count}
-              </span>
+              {tab.replace(/_/g, ' ')}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Applications List */}
-      <div className="space-y-4">
-        {filteredApplications.map((application) => {
-          const config = statusConfig[application.status as keyof typeof statusConfig];
-          const StatusIcon = config.icon;
-          
-          return (
-            <div key={application.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <img
-                    src={application.skillRequest.avatar}
-                    alt={application.skillRequest.author}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{application.skillRequest.title}</h3>
-                    <p className="text-sm text-gray-600">by {application.skillRequest.author}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                    {application.status.replace('_', ' ')}
-                  </span>
-                  <StatusIcon className={`w-5 h-5 ${config.iconColor}`} />
-                </div>
-              </div>
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <SkeletonCardReq />
+          <SkeletonCardReq />
+          <SkeletonCardReq />
+        </div>
+      )}
 
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Your Application Message:</h4>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    "{application.message}"
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
+
+      {!loading && !error && filteredApplications.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredApplications.map((application) => {
+            // Check if the current user is the author of the skill request
+            const isAuthor = currentUserId === application.skillRequest.author.id;
+
+            return (
+              <div key={application.id} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-semibold text-gray-900 truncate">
+                      {application.skillRequest.title}
+                    </h2>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      application.status === ApplicationStatus.PENDING ? 'bg-yellow-100 text-yellow-800' :
+                      application.status === ApplicationStatus.ACCEPTED ? 'bg-green-100 text-green-800' :
+                      application.status === ApplicationStatus.REJECTED ? 'bg-red-100 text-red-800' :
+                      application.status === ApplicationStatus.IN_PROGRESS ? 'bg-blue-100 text-blue-800' :
+                      application.status === ApplicationStatus.COMPLETED ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {getStatusIcon(application.status)}
+                      <span className="ml-1">{getStatusText(application.status)}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600 mb-3">
+                    <img
+                      src={application.skillRequest.author.avatar || 'https://via.placeholder.com/40'}
+                      alt={`${application.skillRequest.author.firstName} ${application.skillRequest.author.lastName}`}
+                      className="w-6 h-6 rounded-full mr-2 object-cover"
+                    />
+                    <span>{application.skillRequest.author.firstName} {application.skillRequest.author.lastName}</span>
+                  </div>
+                  <p className="text-gray-700 text-sm mb-4 line-clamp-3">
+                    {application.message}
                   </p>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <span>Applied on: {formatDate(application.createdAt)}</span>
+                  </div>
                 </div>
-
-                {application.responseMessage && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Response:</h4>
-                    <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                      "{application.responseMessage}"
-                    </p>
-                  </div>
-                )}
-
-                {application.review && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Review Received:</h4>
-                    <div className="bg-purple-50 p-3 rounded-lg">
-                      <div className="flex items-center mb-2">
-                        {[...Array(application.rating)].map((_, i) => (
-                          <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                        ))}
-                        <span className="ml-2 text-sm font-medium text-gray-900">{application.rating}/5</span>
-                      </div>
-                      <p className="text-sm text-gray-600">"{application.review}"</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Applied: {new Date(application.appliedAt).toLocaleDateString()}
-                    </div>
-                    {application.respondedAt && (
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        Responded: {new Date(application.respondedAt).toLocaleDateString()}
-                      </div>
-                    )}
-                    <div>
-                      Timeline: {application.proposedTimeline}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button className="flex items-center text-emerald-600 hover:text-emerald-700">
-                      <Eye className="w-4 h-4 mr-1" />
-                      View Details
+                <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex justify-end space-x-4">
+                  <button
+                    onClick={() => handleViewDetails(application.id)}
+                    className="flex items-center text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View Details
+                  </button>
+                  {/* Only show message button if the current user is NOT the author of the request */}
+                  {application.status === ApplicationStatus.ACCEPTED && !isAuthor && (
+                    <button
+                      onClick={() => handleMessageAuthor(application.skillRequest.author.id, application.skillRequestId, application.skillRequest.title)}
+                      className="flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-1" />
+                      Message
                     </button>
-                    {application.status === 'ACCEPTED' && (
-                      <button className="flex items-center text-blue-600 hover:text-blue-700">
-                        <MessageCircle className="w-4 h-4 mr-1" />
-                        Message
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {filteredApplications.length === 0 && (
+      {filteredApplications.length === 0 && !loading && !error && (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-12 h-12 text-gray-400" />
+            <FileText className="w-12 h-12 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No applications found</h3>
           <p className="text-gray-600 mb-6">
-            {selectedTab === 'all' 
-              ? "You haven't applied to any skill requests yet." 
-              : `No ${selectedTab} applications found.`}
+            {selectedTab === 'all'
+              ? "You haven't applied to any skill requests yet."
+              : `No ${getStatusText(selectedTab as ApplicationStatus)} applications found.`}
           </p>
-          <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300">
-            Browse Skill Requests
-          </button>
         </div>
       )}
     </div>

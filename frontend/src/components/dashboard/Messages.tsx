@@ -1,6 +1,6 @@
 // src/components/Messages.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom'; // Import useParams
+import { useParams } from 'react-router-dom';
 import {
   Search,
   Send,
@@ -13,72 +13,124 @@ import {
   Star,
 } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketProvider';
-import axios from 'axios'; // Import axios
-import { currentUser } from './DashboardLayout'; // Assuming currentUser is available globally or via another context
+import { api } from '../utils/setAuthToken'; // Use your configured axios instance
+
+// Helper function to get current user's details from localStorage
+const getCurrentUser = (): { id: string | null; name: string; avatar: string } => {
+  const userId = localStorage.getItem('userId');
+  const firstName = localStorage.getItem('firstName') || 'Guest';
+  const lastName = localStorage.getItem('lastName') || '';
+  const avatar = localStorage.getItem('avatar') || 'https://via.placeholder.com/50'; // Default avatar
+
+  return {
+    id: userId,
+    name: `${firstName} ${lastName}`.trim(),
+    avatar: avatar,
+  };
+};
 
 interface ChatMessage {
   id: string;
   senderId: string;
-  receiverId: string | null; // receiverId can be null as per your schema (though we're setting it for 1-on-1)
+  receiverId: string | null;
   content: string;
   timestamp: string;
   isOwn: boolean;
-  type: 'CHAT' | 'SYSTEM'; // Add message type
-  senderName: string; // From backend include
-  senderAvatar: string; // From backend include
-  conversationId?:string
+  type: 'CHAT' | 'SYSTEM';
+  senderName: string; // Populated by backend
+  senderAvatar: string; // Populated by backend
+  conversationId: string; // Ensure this is always present
 }
 
-interface Participant {
+// Interface for a chat message received via Socket.IO (should match backend emit structure)
+interface RealtimeChatMessage {
   id: string;
-  name: string;
-  avatar: string;
+  conversationId: string;
+  senderId: string;
+  receiverId: string | null;
+  content: string;
+  timestamp: string;
+  isOwn: boolean; // True if sent by current user, false otherwise
+  type: 'CHAT' | 'SYSTEM';
+  senderName: string;
+  senderAvatar: string;
+}
+
+interface OtherParticipant {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatar?: string;
+  username?: string;
   status?: 'online' | 'away' | 'offline'; // Optional, if you track presence
 }
 
+interface ConversationSkillRequest {
+  id: string;
+  title: string;
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  };
+}
+
 interface Conversation {
-  id: string; // Changed to string to match backend conversationId (UUID)
-  participant: Participant;
+  id: string;
+  participant: OtherParticipant;
   lastMessage: string;
   timestamp: string;
   unreadCount: number;
-  skillRequest: string;
+  skillRequest?: ConversationSkillRequest;
   isStarred: boolean;
 }
 
-const CURRENT_USER_ID = currentUser.id;
-
 export default function Messages() {
   const { socket, isConnected } = useSocket();
-  const { conversationId, otherParticipantId } = useParams<{ conversationId: string; otherParticipantId: string }>(); // Get params from URL
+  const { conversationId, otherParticipantId } = useParams<{ conversationId?: string; otherParticipantId?: string }>();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const currentUser = getCurrentUser(); // Get current user details
+
   // Function to scroll to the bottom of the messages
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Effect to fetch conversations list on component mount
+  // Effect to fetch conversations list and select the current one
   useEffect(() => {
-    const fetchConversations = async () => {
+    const fetchAndSelectConversations = async () => {
+      if (!currentUser.id) {
+        console.error('Current user ID not available for fetching conversations.');
+        return;
+      }
+
       try {
-        const response = await axios.get('/api/conversations', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
-        });
+        const response = await api.get<Conversation[]>(`/api/conversations`);
         setConversations(response.data);
-        // If a conversationId is in the URL, try to select it
-        if (conversationId && response.data.length > 0) {
-          const conv = response.data.find((c: Conversation) => c.id === conversationId);
+
+        if (conversationId) {
+          const conv = response.data.find((c) => c.id === conversationId);
           if (conv) {
             setSelectedConversation(conv);
           } else if (otherParticipantId) {
-            // If convId not found, but otherParticipantId is present, try to construct one
-            // This scenario should be rare if the /new endpoint works correctly.
-            // You might need a more robust way to select/find it or handle redirect.
+            // This case handles direct navigation to a new conversation that might not yet be in the list
+            // If the conversationId from URL is not found in the fetched list,
+            // it implies it's a brand new conversation that might not have a message yet,
+            // or the list hasn't updated. We can construct a temporary selectedConversation
+            // or re-fetch specifically for this conversation.
+            // For robustness, it's better to ensure the 'initiate' endpoint returns the full conversation object.
+            // For now, we'll assume conversationId is valid if present.
+            console.warn(`Conversation ID ${conversationId} not found in list. Attempting to use otherParticipantId.`);
+            // You might want to fetch the other participant's details here
+            // and construct a minimal selectedConversation object.
+            // For simplicity, if conv is not found, selectedConversation remains null,
+            // and the user will see "Select a conversation..."
           }
         } else if (response.data.length > 0) {
           // If no specific conversation is selected, select the first one by default
@@ -89,33 +141,30 @@ export default function Messages() {
       }
     };
 
-    fetchConversations();
-  }, []);
+    fetchAndSelectConversations();
+  }, [currentUser.id, conversationId, otherParticipantId]); // Re-run if URL params or current user changes
 
   // Effect to fetch messages for the selected conversation
   useEffect(() => {
     const fetchMessages = async () => {
-      if (selectedConversation) {
+      if (selectedConversation?.id) {
         try {
-          const response = await axios.get(`/api/conversations/${selectedConversation.id}/messages`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
-          });
-          const fetchedMessages = response.data.map((msg: ChatMessage) => ({
+          const response = await api.get<ChatMessage[]>(`/api/messages/${selectedConversation.id}`);
+          const fetchedMessages = response.data.map((msg) => ({
             ...msg,
-            isOwn: msg.senderId === CURRENT_USER_ID,
+            isOwn: msg.senderId === currentUser.id,
           }));
           setMessages(fetchedMessages);
           scrollToBottom();
 
-          // --- NEW: Join Socket.IO room when conversation is selected ---
+          // Join Socket.IO room when conversation is selected
           if (socket && isConnected) {
             socket.emit('join_conversation', selectedConversation.id);
             console.log(`Joined Socket.IO room: ${selectedConversation.id}`);
           }
-          // --- END NEW ---
-
         } catch (error) {
           console.error('Error fetching messages:', error);
+          setMessages([]); // Clear messages on error
         }
       } else {
         setMessages([]); // Clear messages if no conversation is selected
@@ -124,46 +173,46 @@ export default function Messages() {
 
     fetchMessages();
 
-    // --- NEW: Leave Socket.IO room on component unmount or conversation change ---
+    // Leave Socket.IO room on component unmount or conversation change
     return () => {
-      if (socket && isConnected && selectedConversation) {
+      if (socket && isConnected && selectedConversation?.id) {
         socket.emit('leave_conversation', selectedConversation.id);
         console.log(`Left Socket.IO room: ${selectedConversation.id}`);
       }
     };
-    // --- END NEW ---
-
-  }, [selectedConversation, socket, isConnected]); // Re-run when selectedConversation or socket connection changes
+  }, [selectedConversation, socket, isConnected, currentUser.id]); // Re-run when selectedConversation or socket connection changes
 
   // Effect to handle incoming real-time messages
   useEffect(() => {
     if (socket) {
-      const handleReceiveMessage = (message: ChatMessage) => {
+      const handleReceiveMessage = (message: RealtimeChatMessage) => {
         console.log("Received real-time message:", message);
+
         // Only add message if it belongs to the currently selected conversation
-        if (selectedConversation && message.conversationId === selectedConversation.id) { // Ensure conversationId is part of ChatMessage type
-            setMessages((prevMessages) => {
-                const newMessages = [...prevMessages, {
-                    ...message,
-                    isOwn: message.senderId === CURRENT_USER_ID,
-                }];
-                return newMessages;
-            });
-            scrollToBottom();
+        if (selectedConversation && message.conversationId === selectedConversation.id) {
+          setMessages((prevMessages) => {
+            const newMessages = [...prevMessages, {
+              ...message,
+              isOwn: message.senderId === currentUser.id,
+            }];
+            return newMessages;
+          });
+          scrollToBottom();
         }
 
         // Update conversation list with latest message and unread count
         setConversations(prevConversations => {
           const updatedConversations = prevConversations.map(conv => {
-            if (conv.id === message.conversationId) { // Ensure message has conversationId
+            if (conv.id === message.conversationId) {
+              const newUnreadCount =
+                message.senderId !== currentUser.id && conv.id !== selectedConversation?.id
+                  ? conv.unreadCount + 1
+                  : conv.unreadCount;
               return {
                 ...conv,
-                lastMessage: message.content, // Or format system message differently
+                lastMessage: message.content,
                 timestamp: message.timestamp,
-                // Increment unread count only if message is not from current user AND not the selected conversation
-                unreadCount: (message.senderId !== CURRENT_USER_ID && conv.id !== selectedConversation?.id)
-                             ? conv.unreadCount + 1
-                             : conv.unreadCount
+                unreadCount: newUnreadCount,
               };
             }
             return conv;
@@ -179,7 +228,7 @@ export default function Messages() {
         socket.off('receive_message', handleReceiveMessage);
       };
     }
-  }, [socket, selectedConversation]);
+  }, [socket, selectedConversation, currentUser.id]);
 
 
   // Handle sending messages
@@ -187,11 +236,9 @@ export default function Messages() {
     if (!messageText.trim() || !selectedConversation || !isConnected) return;
 
     try {
-      // --- NEW: Send message via HTTP POST request to your backend API ---
-      const response = await axios.post(
+      const response = await api.post(
         `/api/conversations/${selectedConversation.id}/messages`,
         { content: messageText.trim() },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } }
       );
 
       const sentMessage = response.data; // Backend returns the created message
@@ -203,9 +250,6 @@ export default function Messages() {
       }]);
       setMessageText('');
       scrollToBottom();
-
-      // No need to emit via socket.emit('send_message') here,
-      // because the backend will emit via `io.to(conversationId).emit` after DB save.
 
       // Update the conversation list immediately with this new message
       setConversations(prevConversations => {
@@ -226,6 +270,7 @@ export default function Messages() {
     } catch (error) {
       console.error('Error sending message:', error);
       // Handle error, e.g., show a toast notification
+      alert('Failed to send message. Please try again.');
     }
   };
 
@@ -269,8 +314,8 @@ export default function Messages() {
               >
                 <div className="relative mr-3">
                   <img
-                    src={conv.participant.avatar}
-                    alt={conv.participant.name}
+                    src={conv.participant.avatar || 'https://via.placeholder.com/50'}
+                    alt={`${conv.participant.firstName} ${conv.participant.lastName}`}
                     className="w-12 h-12 rounded-full object-cover"
                   />
                   {/* {conv.participant.status === 'online' && (
@@ -279,13 +324,18 @@ export default function Messages() {
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900 truncate">{conv.participant.name}</h4>
+                    <h4 className="font-semibold text-gray-900 truncate">
+                      {conv.participant.firstName} {conv.participant.lastName}
+                    </h4>
                     <span className="text-xs text-gray-500">
                       {new Date(conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-600 truncate">
-                    <p className="flex-1 truncate pr-2">{conv.lastMessage}</p>
+                    <p className="flex-1 truncate pr-2">
+                      {conv.skillRequest?.title ? `[${conv.skillRequest.title}] ` : ''}
+                      {conv.lastMessage}
+                    </p>
                     {conv.unreadCount > 0 && (
                       <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                         {conv.unreadCount}
@@ -306,12 +356,14 @@ export default function Messages() {
           <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
             <div className="flex items-center">
               <img
-                src={selectedConversation.participant.avatar}
-                alt={selectedConversation.participant.name}
+                src={selectedConversation.participant.avatar || 'https://via.placeholder.com/50'}
+                alt={`${selectedConversation.participant.firstName} ${selectedConversation.participant.lastName}`}
                 className="w-10 h-10 rounded-full object-cover mr-3"
               />
               <div>
-                <h3 className="font-semibold text-gray-900">{selectedConversation.participant.name}</h3>
+                <h3 className="font-semibold text-gray-900">
+                  {selectedConversation.participant.firstName} {selectedConversation.participant.lastName}
+                </h3>
                 {/* <span className="text-sm text-gray-500">
                   {selectedConversation.participant.status === 'online' ? 'Online' : 'Offline'}
                 </span> */}
@@ -347,7 +399,7 @@ export default function Messages() {
                 >
                   {!msg.isOwn && (
                     <img
-                      src={senderDetails.avatar}
+                      src={senderDetails.avatar || 'https://via.placeholder.com/32'}
                       alt={senderDetails.name}
                       className="w-8 h-8 rounded-full object-cover mr-2"
                     />
@@ -374,7 +426,7 @@ export default function Messages() {
                   </div>
                   {msg.isOwn && (
                     <img
-                      src={senderDetails.avatar}
+                      src={senderDetails.avatar || 'https://via.placeholder.com/32'}
                       alt={senderDetails.name}
                       className="w-8 h-8 rounded-full object-cover ml-2"
                     />

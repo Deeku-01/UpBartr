@@ -1,340 +1,346 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Plus, 
-  Eye, 
-  Users, 
-  Clock, 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Eye,
+  Users,
+  Clock,
+  MoreHorizontal,
+  Edit,
+  Trash2,
   Pause,
   Play,
   CheckCircle,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react';
+import { SkeletonCardReq } from '../lib/skeleton';
+import { api } from '../utils/setAuthToken'; // Import the configured axios instance
+import { useNavigate } from 'react-router-dom';
 
+// Define the SkillRequestStatus enum to match your Prisma schema
+enum SkillRequestStatus {
+  OPEN = 'OPEN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  CLOSED = 'CLOSED',
+}
 
-import {SkeletonCardReq} from '../lib/skeleton';
+// Define the Application status enum for applications within a request
+enum ApplicationStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHWITHDRAWN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+}
 
-interface Application {
-  id: number;
-  status: string;
-  skillRequest: {
-    id: number;
-    title: string;
-    description: string;
-    skillNeeded: string;
-    skillOffered: string;
-    category: string;
-    status: string;
-    createdAt: string;
-    author: {
-      id: number;
-      firstName: string;
-      lastName: string;
-      username: string;
-      avatar: string;
-      rating: number;
-    };
-  };
-  review?: {
-    id: number;
-    rating: number;
-    comment: string;
-    createdAt: string;
+// Interface for an application nested within a skill request
+interface ApplicationInRequest {
+  id: string; // Changed from number to string (cuid)
+  status: ApplicationStatus;
+  applicant: {
+    id: string; // Added applicant ID
+    firstName: string;
+    lastName: string;
+    username: string;
+    avatar: string;
   };
 }
 
+// Interface for a transformed skill request to be displayed
 interface TransformedRequest {
-  id: number;
+  id: string; // Changed from number to string (cuid)
   title: string;
   description: string;
   skillNeeded: string;
   skillOffered: string;
   category: string;
-  status: string;
-  applications: number;
-  views: number;
-  createdAt: string;
-  deadline: string;
+  status: SkillRequestStatus; // Use the enum
+  applications: ApplicationInRequest[]; // Array of applications
+  views: number; // Placeholder, as backend currently doesn't provide this directly
+  createdAt: string; // ISO string date
+  deadline: string; // ISO string date
   isRemote: boolean;
-  acceptedApplicant?: string;
+  estimatedDuration: string;
+  location: string;
+  tags: string[];
+  acceptedApplicant?: string; // Derived field
 }
 
 const statusColors = {
-  OPEN: 'bg-green-100 text-green-800',
-  IN_PROGRESS: 'bg-blue-100 text-blue-800',
-  COMPLETED: 'bg-purple-100 text-purple-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-  CLOSED: 'bg-gray-100 text-gray-800'
+  [SkillRequestStatus.OPEN]: 'bg-green-100 text-green-800',
+  [SkillRequestStatus.IN_PROGRESS]: 'bg-blue-100 text-blue-800',
+  [SkillRequestStatus.COMPLETED]: 'bg-purple-100 text-purple-800',
+  [SkillRequestStatus.CANCELLED]: 'bg-red-100 text-red-800',
+  [SkillRequestStatus.CLOSED]: 'bg-gray-100 text-gray-800',
 };
 
 export default function MyRequests() {
-  const [selectedTab, setSelectedTab] = useState('all');
-  const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const [selectedTab, setSelectedTab] = useState<string>('all');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [requests, setRequests] = useState<TransformedRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Transform backend response to frontend format
-  const transformApplicationsToRequests = (applications: Application[]): TransformedRequest[] => {
-    return applications.map(app => ({
-      id: app.skillRequest.id,
-      title: app.skillRequest.title,
-      description: app.skillRequest.description,
-      skillNeeded: app.skillRequest.skillNeeded,
-      skillOffered: app.skillRequest.skillOffered,
-      category: app.skillRequest.category,
-      status: app.skillRequest.status,
-      applications: 0, // You'll need to get this from another endpoint or include in backend
-      views: 0, // You'll need to get this from another endpoint or include in backend
-      createdAt: app.skillRequest.createdAt,
-      deadline: app.skillRequest.createdAt, // Adjust this based on your data structure
-      isRemote: true, // Adjust this based on your data structure
-      acceptedApplicant: app.skillRequest.status === 'IN_PROGRESS' || app.skillRequest.status === 'COMPLETED' 
-        ? `${app.skillRequest.author.firstName} ${app.skillRequest.author.lastName}` 
-        : undefined
-    }));
+  // Function to format date
+  const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  // Fetch applications from API
-  const fetchMyApplications = async (status: string = 'ALL') => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem('authToken'); // Adjust based on how you store the token
-      
-      const response = await axios.get('http://localhost:3000/api/skills/my-applications', {
-        headers: {
-          'authorization': `${token}`
-        },
-        params: {
-          status: status,
-          page: 1,
-          limit: 11, // Adjust as needed
-          sortBy: 'createdAt',
-          sortOrder: 'desc'
-        }
-      });
+  const handleViewDetails = (requestId: string) => {
+    // Navigate to a dedicated skill request detail page
+    navigate(`/dashboard/requests/${requestId}`);
+  };
 
-      const transformedRequests = transformApplicationsToRequests(response.data.applications);
-      setRequests(transformedRequests);
-    } catch (err) {
-      console.error('Error fetching applications:', err);
-      setError('Failed to fetch applications. Please try again.');
+  // Function to fetch requests
+  const fetchMyRequests = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch user profile which contains their skill requests
+      const response = await api.get('/api/users/profile');
+      const userProfile = response.data;
+      const fetchedRequests: TransformedRequest[] = userProfile.skillRequests.map((req: any) => ({
+        id: req.id,
+        title: req.title,
+        description: req.description,
+        skillNeeded: req.skillNeeded,
+        skillOffered: req.skillOffered,
+        category: req.category,
+        status: req.status as SkillRequestStatus, // Cast to enum
+        applications: req.applications.map((app: any) => ({
+          id: app.id,
+          status: app.status as ApplicationStatus,
+          applicant: {
+            id: app.applicant.id,
+            firstName: app.applicant.firstName,
+            lastName: app.applicant.lastName,
+            username: app.applicant.username,
+            avatar: app.applicant.avatar,
+          },
+        })),
+        views: 0, // Assuming views are not directly available from this endpoint yet
+        createdAt: req.createdAt,
+        deadline: req.deadline,
+        isRemote: req.isRemote,
+        estimatedDuration: req.estimatedDuration,
+        location: req.location,
+        tags: req.tags,
+        // Determine acceptedApplicant if needed based on applications status
+        acceptedApplicant: req.applications.find((app: any) => app.status === ApplicationStatus.ACCEPTED)?.applicant.firstName + ' ' + req.applications.find((app: any) => app.status === ApplicationStatus.ACCEPTED)?.applicant.lastName,
+      }));
+      setRequests(fetchedRequests);
+    } catch (err: any) {
+      console.error('Failed to fetch my requests:', err);
+      setError(err.response?.data?.error || 'Failed to load your skill requests. Please try again.');
     } finally {
-      const promise = await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
       setLoading(false);
     }
   };
 
-  // Fetch data on component mount and when tab changes
-
   useEffect(() => {
-    // Always fetch all data first, then filter on frontend
-    fetchMyApplications('ALL');
-  }, [selectedTab]);
+    fetchMyRequests();
+  }, []); // Fetch once on component mount
 
-  const tabs = [
-    { id: 'all', name: 'All Requests', count: requests.length },
-    { id: 'open', name: 'Open', count: requests.filter(r => r.status === 'OPEN').length },
-    { id: 'in_progress', name: 'In Progress', count: requests.filter(r => r.status === 'IN_PROGRESS').length },
-    { id: 'completed', name: 'Completed', count: requests.filter(r => r.status === 'COMPLETED').length }
-  ];
+  const handleMenuToggle = (id: string) => {
+    setOpenMenuId(openMenuId === id ? null : id);
+  };
 
-  const filteredRequests = selectedTab === 'all' 
-    ? requests 
-    : requests.filter(r => r.status.toLowerCase() === selectedTab);
+  const handleEditRequest = (id: string) => {
+    // Implement navigation to edit page
+    console.log('Edit request:', id);
+    setOpenMenuId(null);
+  };
 
+  const handleUpdateStatus = async (id: string, newStatus: SkillRequestStatus) => {
+    try {
+      await api.put(`/api/skillreqs/${id}`, { status: newStatus });
+      // Update the local state to reflect the change
+      setRequests(prevRequests =>
+        prevRequests.map(req =>
+          req.id === id ? { ...req, status: newStatus } : req
+        )
+      );
+      setOpenMenuId(null);
+    } catch (err: any) {
+      console.error(`Failed to update request status to ${newStatus}:`, err);
+      setError(err.response?.data?.error || `Failed to update request status. Please try again.`);
+    }
+  };
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Skill Requests</h1>
-            <p className="text-gray-600 mt-1">Manage your posted skill requests and track applications</p>
-          </div>
-        </div>
-        <div className="text-center py-12">
-          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-12 h-12 text-red-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Requests</h3>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button 
-            onClick={() => fetchMyApplications()}
-            className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteRequest = async (id: string) => {
+    try {
+      await api.delete(`/api/skillreqs/${id}`);
+      // Remove the request from the local state
+      setRequests(prevRequests => prevRequests.filter(req => req.id !== id));
+      setOpenMenuId(null);
+    } catch (err: any) {
+      console.error('Failed to delete request:', err);
+      setError(err.response?.data?.error || 'Failed to delete request. Please try again.');
+    }
+  };
+
+  const filteredRequests = requests.filter((request) => {
+    if (selectedTab === 'all') return true;
+    return request.status.toLowerCase().replace('_', '-') === selectedTab;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Skill Requests</h1>
-          <p className="text-gray-600 mt-1">Manage your posted skill requests and track applications</p>
-        </div>
+    <div className="container mx-auto p-6 bg-white rounded-lg shadow-md">
+      <div className="mb-6 flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">My Skill Requests</h1>
+        <button
+          onClick={() => console.log('Navigate to create request')}
+          className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300 flex items-center"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Create New Request
+        </button>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          {['all', 'open', 'in-progress', 'completed', 'cancelled', 'closed'].map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                selectedTab === tab.id
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              className={`${
+                selectedTab === tab
                   ? 'border-emerald-500 text-emerald-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              {tab.name}
-              <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2.5 rounded-full text-xs">
-                {tab.count}
-              </span>
+              {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* loading Skeleton *5 */}
       {loading && (
-        <div>
-          {Array.from({ length: 2 }).map((_, index) => (
-            <SkeletonCardReq key={index} />
-          ))}
-
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <SkeletonCardReq />
+          <SkeletonCardReq />
+          <SkeletonCardReq />
         </div>
       )}
 
-
-      {/* Requests List */}
-      {!loading &&(
-      <div className="space-y-4">
-        {filteredRequests.map((request) => (
-          <div key={request.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900">{request.title}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[request.status as keyof typeof statusColors]}`}>
-                    {request.status.replace('_', ' ')}
-                  </span>
-                  {request.isRemote && (
-                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                      Remote OK
-                    </span>
-                  )}
-                </div>
-                
-                <p className="text-gray-600 mb-4 line-clamp-2">{request.description}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <span className="text-sm font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Needs:</span>
-                    <span className="text-sm text-gray-700 ml-2">{request.skillNeeded}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Offers:</span>
-                    <span className="text-sm text-gray-700 ml-2">{request.skillOffered}</span>
-                  </div>
-                </div>
-
-                {request.acceptedApplicant && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <CheckCircle className="w-4 h-4 inline mr-1" />
-                      Working with: <span className="font-medium">{request.acceptedApplicant}</span>
-                    </p>
-                  </div>
-                )}
-                
-                <div className="flex items-center space-x-6 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    {request.applications} applications
-                  </div>
-                  <div className="flex items-center">
-                    <Eye className="w-4 h-4 mr-1" />
-                    {request.views} views
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="w-4 h-4 mr-1" />
-                    Created: {new Date(request.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="relative">
-                <button
-                  onClick={() => setShowDropdown(showDropdown === request.id ? null : request.id)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-                >
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-                
-                {showDropdown === request.id && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                    <div className="py-1">
-                      <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <Eye className="w-4 h-4 mr-3" />
-                        View Details
-                      </button>
-                      <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <Edit className="w-4 h-4 mr-3" />
-                        Edit Request
-                      </button>
-                      {request.status === 'OPEN' && (
-                        <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                          <Pause className="w-4 h-4 mr-3" />
-                          Pause Request
-                        </button>
-                      )}
-                      {request.status === 'CLOSED' && (
-                        <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                          <Play className="w-4 h-4 mr-3" />
-                          Reopen Request
-                        </button>
-                      )}
-                      <hr className="my-1" />
-                      <button className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                        <Trash2 className="w-4 h-4 mr-3" />
-                        Delete Request
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md flex items-center mb-4" role="alert">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          <span>{error}</span>
+        </div>
       )}
 
-      {filteredRequests.length === 0 && !loading && (
+      {!loading && !error && filteredRequests.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredRequests.map((request) => (
+            <div key={request.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-3">
+                  <span
+                    className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${
+                      statusColors[request.status]
+                    }`}
+                  >
+                    {request.status.replace('_', ' ')}
+                  </span>
+                  <div className="relative">
+                    <button
+                      onClick={() => handleMenuToggle(request.id)}
+                      className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                    {openMenuId === request.id && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
+                        <button
+                          onClick={() => handleEditRequest(request.id)}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Edit className="w-4 h-4 mr-3" />
+                          Edit Request
+                        </button>
+                        {request.status === SkillRequestStatus.OPEN && (
+                          <button
+                            onClick={() => handleUpdateStatus(request.id, SkillRequestStatus.CLOSED)}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <Pause className="w-4 h-4 mr-3" />
+                            Close Request
+                          </button>
+                        )}
+                        {request.status === SkillRequestStatus.CLOSED && (
+                          <button
+                            onClick={() => handleUpdateStatus(request.id, SkillRequestStatus.OPEN)}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <Play className="w-4 h-4 mr-3" />
+                            Reopen Request
+                          </button>
+                        )}
+                        <hr className="my-1" />
+                        <button
+                          onClick={() => handleDeleteRequest(request.id)}
+                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4 mr-3" />
+                          Delete Request
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">{request.title}</h2>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{request.description}</p>
+                <div className="flex items-center text-gray-500 text-sm mb-2">
+                  <Clock className="w-4 h-4 mr-2" />
+                  <span>Duration: {request.estimatedDuration}</span>
+                </div>
+                <div className="flex items-center text-gray-500 text-sm mb-4">
+                  <Users className="w-4 h-4 mr-2" />
+                  <span>{request.applications.length} Applications</span>
+                </div>
+                {request.acceptedApplicant && (
+                  <div className="flex items-center text-emerald-600 text-sm mb-4">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    <span>Accepted: {request.acceptedApplicant}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-sm text-gray-500">
+                  <span>Posted: {formatDate(request.createdAt)}</span>
+                  <span>Deadline: {request.deadline ? formatDate(request.deadline) : 'N/A'}</span>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex justify-end">
+                 <button
+                    onClick={() => handleViewDetails(request.id)}
+                    className="flex items-center text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View Details
+                  </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {filteredRequests.length === 0 && !loading && !error && (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileText className="w-12 h-12 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No requests found</h3>
           <p className="text-gray-600 mb-6">
-            {selectedTab === 'all' 
-              ? "You haven't created any skill requests yet." 
+            {selectedTab === 'all'
+              ? "You haven't created any skill requests yet."
               : `No ${selectedTab.replace('_', ' ')} requests found.`}
           </p>
-          <button className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-blue-700 transition-all duration-300">
-            Create Your First Request
-          </button>
         </div>
       )}
     </div>

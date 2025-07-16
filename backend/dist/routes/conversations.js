@@ -1,13 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/routes/conversation.ts
+// src/routes/conversations.ts
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const authMiddleware_1 = require("../middleware/authMiddleware");
-const crypto_1 = __importDefault(require("crypto"));
 const router = (0, express_1.Router)();
 const db = new client_1.PrismaClient();
 // @route   GET /api/conversations
@@ -16,413 +12,238 @@ const db = new client_1.PrismaClient();
 // @ts-ignore
 router.get('/', authMiddleware_1.authenticateToken, async (req, res) => {
     const currentUserId = req.user?.id;
+    // Allow filtering by skillRequestId, though the Conversation model doesn't directly link to it.
+    // This will primarily rely on messages linked to skill requests.
+    const skillRequestIdFilter = req.query.skillRequestId;
     if (!currentUserId) {
         return res.status(401).json({ error: 'Authentication required.' });
     }
     try {
-        // Fetch all messages involving the current user, ordered by timestamp to easily find the last message for each conversation
-        const messages = await db.message.findMany({
+        // Fetch conversations where the current user is a participant
+        const userConversations = await db.conversationParticipant.findMany({
             where: {
-                OR: [
-                    { senderId: currentUserId },
-                    { receiverId: currentUserId },
-                ],
+                userId: currentUserId,
+            },
+            select: {
+                conversation: {
+                    include: {
+                        participants: {
+                            include: {
+                                user: {
+                                    select: {
+                                        id: true,
+                                        firstName: true,
+                                        lastName: true,
+                                        avatar: true,
+                                        username: true,
+                                    },
+                                },
+                            },
+                        },
+                        messages: {
+                            orderBy: { timestamp: 'desc' },
+                            take: 1, // Get only the latest message
+                            include: {
+                                sender: { select: { firstName: true, lastName: true, avatar: true } },
+                                skillRequest: { select: { title: true } }, // Include skill request title
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
-                timestamp: 'desc', // Most recent messages first
-            },
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        avatar: true,
-                        username: true,
-                    },
-                },
-                receiver: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        avatar: true,
-                        username: true,
-                    },
+                conversation: {
+                    updatedAt: 'desc', // Assuming Conversation has an updatedAt field
                 },
             },
         });
-        const conversationMap = new Map(); // Map to store conversations, keyed by conversationId
-        for (const msg of messages) {
-            if (!conversationMap.has(msg.conversationId)) {
-                // This is the latest message for this conversation
-                const otherParticipant = msg.senderId === currentUserId ? msg.receiver : msg.sender;
-                // Fetch unread count for this conversation for the current user
-                const unreadCount = await db.message.count({
+        const conversations = [];
+        for (const userConv of userConversations) {
+            const conversation = userConv.conversation;
+            if (!conversation)
+                continue;
+            // Find the other participant in this conversation
+            const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId)?.user;
+            if (!otherParticipant)
+                continue; // Skip if no other participant (e.g., malformed data or single-user conversation)
+            const lastMessage = conversation.messages[0]; // Get the latest message
+            // Count unread messages for this conversation where the current user is the receiver
+            const unreadCount = await db.message.count({
+                where: {
+                    conversationId: conversation.id,
+                    receiverId: currentUserId,
+                    read: false,
+                },
+            });
+            // If a skillRequestId filter is applied, check if any message in this conversation is linked to it
+            if (skillRequestIdFilter) {
+                const hasMatchingSkillRequest = await db.message.count({
                     where: {
-                        conversationId: msg.conversationId,
-                        receiverId: currentUserId,
-                        read: false,
-                        type: 'CHAT', // Only count chat messages as unread
+                        conversationId: conversation.id,
+                        skillRequestId: skillRequestIdFilter,
                     },
-                });
-                conversationMap.set(msg.conversationId, {
-                    id: msg.conversationId,
-                    participant: {
-                        id: otherParticipant?.id,
-                        firstName: otherParticipant?.firstName,
-                        lastName: otherParticipant?.lastName,
-                        avatar: otherParticipant?.avatar,
-                        username: otherParticipant?.username,
-                    },
-                    lastMessage: msg.content,
-                    timestamp: msg.timestamp.toISOString(),
-                    unreadCount: unreadCount,
-                    skillRequest: 'N/A', // Placeholder: This field would typically come from a Conversation model linked to SkillRequest
-                    isStarred: false, // Placeholder: This field would typically be on a Conversation model
-                });
+                }) > 0;
+                if (!hasMatchingSkillRequest) {
+                    continue; // Skip this conversation if it doesn't match the skillRequestId filter
+                }
             }
+            conversations.push({
+                id: conversation.id,
+                participant: {
+                    id: otherParticipant.id,
+                    firstName: otherParticipant.firstName,
+                    lastName: otherParticipant.lastName,
+                    avatar: otherParticipant.avatar,
+                    username: otherParticipant.username,
+                },
+                lastMessage: lastMessage ? lastMessage.content : 'No messages yet.',
+                timestamp: lastMessage ? lastMessage.timestamp.toISOString() : conversation.createdAt.toISOString(),
+                unreadCount: unreadCount,
+                skillRequest: lastMessage?.skillRequest?.title || 'General Chat', // Get title from message's skillRequest
+                isStarred: false, // Placeholder, implement if you add starring functionality to Conversation model
+            });
         }
-        const conversations = Array.from(conversationMap.values());
-        // Sort conversations by the timestamp of their last message (most recent first)
-        conversations.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        res.status(200).json(conversations);
+        res.json(conversations);
     }
     catch (error) {
-        console.error('Error fetching conversations list:', error);
-        res.status(500).json({ error: 'Failed to retrieve conversations list.' });
+        console.error('Error fetching conversations:', error);
+        res.status(500).json({ error: 'Failed to fetch conversations.' });
     }
 });
-// @route   GET /api/conversations/:conversationId/messages
-// @desc    Get messages for a specific conversation
+// @route   POST /api/conversations/initiate
+// @desc    Initiate a conversation with another user (finds existing or creates new)
 // @access  Private
 // @ts-ignore
-router.get('/:conversationId/messages', authMiddleware_1.authenticateToken, async (req, res) => {
+router.post('/initiate', authMiddleware_1.authenticateToken, async (req, res) => {
     const currentUserId = req.user?.id;
-    const { conversationId } = req.params;
+    const { otherUserId, skillRequestId, applicationId, initialMessage } = req.body; // Added skillRequestId, applicationId, initialMessage
     if (!currentUserId) {
         return res.status(401).json({ error: 'Authentication required.' });
     }
+    if (!otherUserId) {
+        return res.status(400).json({ error: 'Other user ID is required to initiate a conversation.' });
+    }
+    if (currentUserId === otherUserId) {
+        return res.status(400).json({ error: 'Cannot initiate a conversation with yourself.' });
+    }
     try {
-        const messageInConversation = await db.message.findFirst({
+        // 1. Find an existing conversation that includes both users
+        // This requires checking the ConversationParticipant model
+        const existingConversationParticipants = await db.conversationParticipant.findMany({
             where: {
-                conversationId: conversationId,
-                OR: [
-                    { senderId: currentUserId },
-                    { receiverId: currentUserId },
-                ],
+                userId: { in: [currentUserId, otherUserId] },
             },
-            select: { id: true, senderId: true, receiverId: true },
+            select: {
+                conversationId: true,
+            },
         });
-        if (!messageInConversation) {
-            return res.status(403).json({ error: 'Access denied to this conversation or conversation does not exist.' });
+        // Group by conversationId to find conversations with both participants
+        const conversationCounts = new Map();
+        for (const cp of existingConversationParticipants) {
+            conversationCounts.set(cp.conversationId, (conversationCounts.get(cp.conversationId) || 0) + 1);
         }
-        const messages = await db.message.findMany({
-            where: { conversationId: conversationId },
-            orderBy: { timestamp: 'asc' },
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        avatar: true
-                    }
-                }
+        let existingConversationId = null;
+        for (const [convId, count] of conversationCounts.entries()) {
+            // For a 1-on-1 chat, we expect count of 2 (both participants)
+            if (count === 2) {
+                // Optionally, if you want to link it to a specific skillRequest or application,
+                // you might need to query messages within that conversation
+                // For simplicity here, we'll just take the first 1-on-1 found.
+                existingConversationId = convId;
+                break;
             }
-        });
-        await db.message.updateMany({
-            where: {
-                conversationId: conversationId,
-                NOT: { senderId: currentUserId },
-                read: false,
-                type: 'CHAT'
+        }
+        let conversation;
+        if (existingConversationId) {
+            conversation = await db.conversation.findUnique({
+                where: { id: existingConversationId },
+                select: { id: true },
+            });
+            return res.status(200).json({ conversationId: conversation?.id, message: 'Conversation already exists.' });
+        }
+        // 2. If no conversation exists, create a new one
+        conversation = await db.conversation.create({
+            data: {
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                participants: {
+                    create: [
+                        { userId: currentUserId },
+                        { userId: otherUserId },
+                    ],
+                },
             },
-            data: { read: true }
+            select: {
+                id: true,
+            },
         });
-        const transformedMessages = messages.map(msg => ({
-            id: msg.id,
-            senderId: msg.senderId,
-            receiverId: msg.senderId === currentUserId ? msg.receiverId : msg.senderId,
-            content: msg.content,
-            timestamp: msg.timestamp.toISOString(),
-            isOwn: msg.senderId === currentUserId,
-            type: msg.type,
-            senderName: `${msg.sender.firstName} ${msg.sender.lastName}`,
-            senderAvatar: msg.sender.avatar
-        }));
-        res.status(200).json(transformedMessages);
+        // Optionally, create an initial message
+        if (initialMessage) {
+            await db.message.create({
+                data: {
+                    conversationId: conversation.id,
+                    senderId: currentUserId,
+                    receiverId: otherUserId, // Explicitly set receiver for 1-on-1
+                    content: initialMessage,
+                    type: 'CHAT', // Or 'SYSTEM' if it's an auto-generated welcome
+                    read: false,
+                    timestamp: new Date(),
+                    skillRequestId: skillRequestId || null,
+                    applicationId: applicationId || null,
+                },
+            });
+        }
+        res.status(201).json({ conversationId: conversation.id, message: 'New conversation created.' });
     }
     catch (error) {
-        console.error('Error fetching messages:', error);
-        res.status(500).json({ error: 'Failed to retrieve messages.' });
+        console.error('Error initiating conversation:', error);
+        res.status(500).json({ error: 'Failed to initiate conversation.' });
     }
 });
 // @route   POST /api/conversations/:conversationId/messages
-// @desc    Send a new message in a conversation
+// @desc    Send a message in a conversation
 // @access  Private
 // @ts-ignore
 router.post('/:conversationId/messages', authMiddleware_1.authenticateToken, async (req, res) => {
-    const currentUserId = req.user?.id;
     const { conversationId } = req.params;
-    const { content } = req.body;
+    const { content, type = 'CHAT', skillRequestId = null, applicationId = null } = req.body; // Default type to CHAT
+    const currentUserId = req.user?.id;
     if (!currentUserId) {
         return res.status(401).json({ error: 'Authentication required.' });
     }
-    if (!content || typeof content !== 'string' || content.trim() === '') {
+    if (!content) {
         return res.status(400).json({ error: 'Message content cannot be empty.' });
     }
     try {
-        const conversationParticipants = await db.message.findMany({
-            where: {
-                conversationId: conversationId,
-                OR: [
-                    { senderId: currentUserId },
-                    { receiverId: currentUserId },
-                ],
-            },
-            select: { senderId: true, receiverId: true },
-            distinct: ['senderId', 'receiverId'],
-            take: 2
-        });
-        if (conversationParticipants.length === 0) {
-            return res.status(404).json({ error: 'Conversation not found or access denied.' });
-        }
-        const allParticipantIds = new Set();
-        conversationParticipants.forEach(msg => {
-            allParticipantIds.add(msg.senderId);
-            if (msg.receiverId)
-                allParticipantIds.add(msg.receiverId);
-        });
-        if (!allParticipantIds.has(currentUserId)) {
-            return res.status(403).json({ error: 'You are not a participant in this conversation.' });
-        }
-        allParticipantIds.delete(currentUserId);
-        const otherParticipantId = allParticipantIds.size === 1 ? allParticipantIds.values().next().value : null;
-        if (!otherParticipantId) {
-            return res.status(400).json({ error: 'Could not determine receiver for this message.' });
-        }
-        const newMessage = await db.message.create({
-            data: {
-                conversationId: conversationId,
-                senderId: currentUserId,
-                receiverId: otherParticipantId,
-                content: content.trim(),
-                type: "CHAT",
-                read: false,
-            },
+        // Verify the conversation exists and the current user is a participant
+        const conversation = await db.conversation.findUnique({
+            where: { id: conversationId },
             include: {
-                sender: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        avatar: true
-                    }
+                participants: {
+                    select: { userId: true }
                 }
             }
         });
-        // --- NEW/UPDATED: Integrate Socket.IO here to emit the new message to connected clients ---
-        const io = req.app.get('io'); // Get the Socket.IO instance from app
-        if (io) {
-            // Prepare the message data to be sent over WebSocket, matching frontend ChatMessage interface
-            const messageToEmit = {
-                id: newMessage.id,
-                senderId: newMessage.senderId,
-                receiverId: newMessage.receiverId,
-                content: newMessage.content,
-                timestamp: newMessage.timestamp.toISOString(),
-                isOwn: false, // This will be set to true on the sender's frontend, false for receiver
-                type: newMessage.type,
-                senderName: `${newMessage.sender.firstName} ${newMessage.sender.lastName}`,
-                senderAvatar: newMessage.sender.avatar
-            };
-            // Emit the message to all clients in this specific conversation room
-            io.to(conversationId).emit('receive_message', messageToEmit);
-            // Optional: Send a notification to the receiver's personal room if they are not in this conversation room
-            // This logic would be more complex and might involve checking if `otherParticipantId`'s sockets are in `conversationId` room
-            // For simplicity, we'll rely on the `receive_message` for now.
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found.' });
         }
-        // --- END NEW/UPDATED ---
-        res.status(201).json({
-            id: newMessage.id,
-            senderId: newMessage.senderId,
-            receiverId: newMessage.receiverId,
-            content: newMessage.content,
-            timestamp: newMessage.timestamp.toISOString(),
-            isOwn: newMessage.senderId === currentUserId, // This is for the sender's immediate UI update
-            type: newMessage.type,
-            senderName: `${newMessage.sender.firstName} ${newMessage.sender.lastName}`,
-            senderAvatar: newMessage.sender.avatar
-        });
-    }
-    catch (error) {
-        console.error('Error sending message:', error);
-        res.status(500).json({ error: 'Failed to send message.' });
-    }
-});
-// ... (previous routes: POST /new/:otherUserId, GET /) ...
-// @route   GET /api/conversations/:conversationId/messages
-// @desc    Get messages for a specific conversation
-// @access  Private
-// @ts-ignore
-router.get('/:conversationId/messages', authMiddleware_1.authenticateToken, async (req, res) => {
-    const currentUserId = req.user?.id;
-    const { conversationId } = req.params;
-    if (!currentUserId) {
-        return res.status(401).json({ error: 'Authentication required.' });
-    }
-    try {
-        const messageInConversation = await db.message.findFirst({
-            where: {
-                conversationId: conversationId,
-                OR: [
-                    { senderId: currentUserId },
-                    { receiverId: currentUserId },
-                ],
-            },
-            select: { id: true, senderId: true, receiverId: true },
-        });
-        if (!messageInConversation) {
-            return res.status(403).json({ error: 'Access denied to this conversation or conversation does not exist.' });
+        const participantUserIds = conversation.participants.map(p => p.userId);
+        if (!participantUserIds.includes(currentUserId)) {
+            return res.status(403).json({ error: 'Not authorized to send messages in this conversation.' });
         }
-        const messages = await db.message.findMany({
-            where: { conversationId: conversationId },
-            orderBy: { timestamp: 'asc' },
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        avatar: true,
-                        username: true,
-                    },
-                },
-            },
-        });
-        // Mark messages as read for the current user
-        await db.message.updateMany({
-            where: {
-                conversationId: conversationId,
-                receiverId: currentUserId,
-                read: false,
-            },
-            data: {
-                read: true,
-            },
-        });
-        res.status(200).json(messages);
-    }
-    catch (error) {
-        console.error('Error fetching messages:', error);
-        res.status(500).json({ error: 'Failed to fetch messages.' });
-    }
-});
-// @route   GET /api/conversations/stats
-// @desc    Get conversation statistics for the authenticated user (e.g., unread messages)
-// @access  Private
-// NEW ENDPOINT FOR DASHBOARD STATS
-// @ts-ignore
-router.get('/stats', authMiddleware_1.authenticateToken, async (req, res) => {
-    try {
-        const currentUserId = req.user?.id;
-        if (!currentUserId) {
-            return res.status(401).json({ error: 'Authentication required.' });
-        }
-        const unreadMessages = await db.message.count({
-            where: {
-                receiverId: currentUserId,
-                read: false,
-            },
-        });
-        res.json({ unreadMessages });
-    }
-    catch (error) {
-        console.error('Error fetching conversation stats:', error);
-        res.status(500).json({ error: 'Failed to fetch conversation statistics' });
-    }
-});
-// @route   POST /api/conversations/messages
-// @desc    Send a new message within a conversation
-// @access  Private
-// @ts-ignore
-router.post('/messages', authMiddleware_1.authenticateToken, async (req, res) => {
-    const currentUserId = req.user?.id;
-    const { conversationId, receiverId, content } = req.body; // conversationId is now explicitly passed from frontend
-    if (!currentUserId || !receiverId || !content) {
-        return res.status(400).json({ error: 'Sender, receiver, conversation ID, and content are required.' });
-    }
-    try {
-        // --- NEW/UPDATED ---
-        // First, ensure the conversation exists or create it if this is the first message
-        // If conversationId is provided, validate it belongs to the users
-        // If not provided, it means it's a new conversation initiation
-        let conversation;
-        if (conversationId) {
-            // Validate that the conversationId is valid and involves both users
-            conversation = await db.conversation.findFirst({
-                where: {
-                    id: conversationId,
-                    participants: {
-                        some: {
-                            userId: {
-                                in: [currentUserId, receiverId]
-                            }
-                        }
-                    }
-                },
-                include: { participants: true } // Include participants to verify
-            });
-            if (!conversation || conversation.participants.length < 2) {
-                return res.status(404).json({ error: 'Conversation not found or invalid participants.' });
-            }
-        }
-        else {
-            // Find if a conversation already exists between these two users
-            conversation = await db.conversation.findFirst({
-                where: {
-                    AND: [
-                        {
-                            participants: {
-                                some: { userId: currentUserId }
-                            }
-                        },
-                        {
-                            participants: {
-                                some: { userId: receiverId }
-                            }
-                        }
-                    ]
-                },
-                include: { participants: true }
-            });
-            if (!conversation) {
-                // Create a new conversation if none exists
-                conversation = await db.conversation.create({
-                    data: {
-                        id: `conv_${crypto_1.default.randomBytes(16).toString('hex')}`, // Generate a unique ID for the conversation
-                        participants: {
-                            create: [
-                                { userId: currentUserId },
-                                { userId: receiverId }
-                            ]
-                        }
-                    },
-                    include: { participants: true }
-                });
-            }
-        }
-        // Now, create the message using the determined conversation.id
+        // Determine the receiverId for a 1-on-1 chat
+        const receiverId = participantUserIds.find(id => id !== currentUserId) || null;
         const newMessage = await db.message.create({
             data: {
-                conversationId: conversation.id, // Use the ID of the found or created conversation
+                conversationId,
                 senderId: currentUserId,
-                receiverId: receiverId, // This might be redundant if using conversationId, but useful for filtering
-                content: content,
+                receiverId, // Set the other participant as receiver
+                content,
+                type,
+                skillRequestId,
+                applicationId,
                 timestamp: new Date(),
-                read: false,
-                type: 'CHAT', // Default message type
+                read: false, // Mark as unread for the receiver
             },
             include: {
                 sender: {
@@ -434,7 +255,11 @@ router.post('/messages', authMiddleware_1.authenticateToken, async (req, res) =>
                 },
             },
         });
-        // --- Socket.IO integration (assuming 'io' is accessible via app.set('io')) ---
+        // Update conversation's updatedAt to bring it to top of list
+        await db.conversation.update({
+            where: { id: conversationId },
+            data: { updatedAt: new Date() },
+        });
         const io = req.app.get('io'); // Get the Socket.IO instance from the app
         if (io) {
             const messageToEmit = {
@@ -452,7 +277,6 @@ router.post('/messages', authMiddleware_1.authenticateToken, async (req, res) =>
             // Emit the message to all clients in this specific conversation room
             io.to(conversation.id).emit('receive_message', messageToEmit); // Use conversation.id
         }
-        // --- END NEW/UPDATED ---\
         res.status(201).json({
             id: newMessage.id,
             senderId: newMessage.senderId,
@@ -468,6 +292,29 @@ router.post('/messages', authMiddleware_1.authenticateToken, async (req, res) =>
     catch (error) {
         console.error('Error sending message:', error);
         res.status(500).json({ error: 'Failed to send message.' });
+    }
+});
+// @route   GET /api/conversations/stats
+// @desc    Get conversation statistics for the authenticated user
+// @access  Private
+// @ts-ignore
+router.get('/stats', authMiddleware_1.authenticateToken, async (req, res) => {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+        return res.status(401).json({ error: 'Authentication required.' });
+    }
+    try {
+        const unreadMessagesCount = await db.message.count({
+            where: {
+                receiverId: currentUserId,
+                read: false,
+            },
+        });
+        res.json({ unreadMessages: unreadMessagesCount });
+    }
+    catch (error) {
+        console.error('Error fetching conversation stats:', error);
+        res.status(500).json({ error: 'Failed to fetch conversation statistics.' });
     }
 });
 exports.default = router;
